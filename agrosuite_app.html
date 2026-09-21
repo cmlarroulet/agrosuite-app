@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgroSuite</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#f0f2f0;--card:#fff;--border:#dde3dd;--border2:#b8c4b8;
+  --text:#1c2b1c;--text2:#4a5e4a;--text3:#8a9e8a;
+  --green:#2d6a2d;--green2:#4a9e4a;--green-bg:#e8f5e8;--green-light:#f2faf2;
+  --amber:#8a6200;--amber-bg:#fff3cd;
+  --red:#c0392b;--red-bg:#fde8e6;
+  --blue:#1a5276;--blue-bg:#d6eaf8;
+  --frost:#2471a3;--frost-bg:#d6eaf8;
+  --purple:#5b2c8e;--purple-bg:#ede7f6;
+  --sidebar-w:210px;--r:6px;--r2:10px;
+}
+body{background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;}
+#app{display:flex;flex:1;overflow:hidden;}
+#sidebar{width:var(--sidebar-w);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+#topbar{height:50px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;}
+#content{flex:1;overflow-y:auto;padding:16px 18px;}
+.logo{padding:13px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;}
+.logo-icon{width:26px;height:26px;background:var(--green);border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;}
+.logo span{font-weight:700;font-size:14px;color:var(--green);}
+.nav-section{padding:8px 0 4px;}
+.nav-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.07em;padding:4px 15px 2px;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:6px 15px;cursor:pointer;font-size:12px;color:var(--text2);border-left:2px solid transparent;transition:all .12s;}
+.nav-item:hover{background:var(--green-light);}
+.nav-item.active{background:var(--green-bg);color:var(--green);border-left-color:var(--green);font-weight:600;}
+.sidebar-footer{margin-top:auto;padding:10px 15px;border-top:1px solid var(--border);}
+.user-pill{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:var(--r);}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.page-title{font-size:14px;font-weight:700;flex:1;}
+.tbadge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;}
+.tb-green{background:var(--green-bg);color:var(--green);}
+.tb-amber{background:var(--amber-bg);color:var(--amber);}
+.tb-red{background:var(--red-bg);color:var(--red);}
+.tb-blue{background:var(--blue-bg);color:var(--blue);}
+.tbtn{height:28px;padding:0 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--card);color:var(--text2);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .12s;white-space:nowrap;}
+.tbtn:hover{background:var(--bg);}
+.tbtn-primary{background:var(--green);color:#fff;border-color:var(--green);}
+.tbtn-primary:hover{opacity:.9;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:14px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;}
+.card-title{font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px;display:flex;flex-direction:column;gap:3px;}
+.metric-label{font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.metric-val{font-size:22px;font-weight:700;line-height:1.1;}
+.metric-sub{font-size:10px;color:var(--text3);}
+.m-green .metric-val{color:var(--green);}
+.m-amber .metric-val{color:var(--amber);}
+.m-frost .metric-val{color:var(--frost);}
+.m-purple .metric-val{color:var(--purple);}
+.alert{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:var(--r);border:1px solid;margin-bottom:8px;font-size:11px;}
+.alert-title{font-weight:700;margin-bottom:2px;font-size:12px;}
+.a-red{background:var(--red-bg);border-color:#f0b0a8;color:var(--red);}
+.a-amber{background:var(--amber-bg);border-color:#f0d080;color:var(--amber);}
+.a-blue{background:var(--blue-bg);border-color:#a0c8e8;color:var(--blue);}
+.a-green{background:var(--green-bg);border-color:#a0d0a0;color:var(--green);}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+th{font-size:10px;font-weight:700;color:var(--text2);text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;white-space:nowrap;}
+td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--green-light);}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;}
+.dot-green{background:var(--green2);}
+.dot-red{background:var(--red);}
+.bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;background:var(--green2);}
+.chart-wrap{position:relative;}
+.tabs{display:flex;gap:2px;background:var(--bg);border-radius:var(--r);padding:3px;margin-bottom:14px;}
+.tab{padding:4px 11px;border-radius:5px;font-size:11px;cursor:pointer;color:var(--text2);font-weight:600;transition:all .12s;}
+.tab.active{background:var(--card);color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+.loading{display:flex;align-items:center;justify-content:center;height:150px;color:var(--text3);font-size:12px;gap:8px;}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+input,select,textarea{padding:7px 9px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px;width:100%;}
+input:focus,select:focus{outline:none;border-color:var(--green);}
+label{font-size:11px;font-weight:600;display:block;margin-bottom:4px;color:var(--text2);}
+.btn-primary{background:var(--green);color:#fff;border:none;border-radius:var(--r);padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;width:100%;}
+.sel{height:26px;padding:0 7px;border:1px solid var(--border2);border-radius:var(--r);font-size:11px;background:var(--card);color:var(--text);width:auto;}
+.stat-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
+.stat-row:last-child{border-bottom:none;}
+.empty{color:var(--text3);font-size:11px;padding:12px 0;text-align:center;}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">A</div>
+    <span>AgroSuite</span>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">General</div>
+    <div class="nav-item active" data-page="dashboard">🌿 Dashboard</div>
+    <div class="nav-item" data-page="clima">🌦 Clima & Alertas</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Productivo</div>
+    <div class="nav-item" data-page="frio">❄️ Frío & GD</div>
+    <div class="nav-item" data-page="poda">✂️ Poda & Vigor</div>
+    <div class="nav-item" data-page="produccion">📦 Producción &amp; Comparativo</div>
+    <div class="nav-item" data-page="fenologia">🌸 Fenología</div>
+    <div class="nav-item" data-page="labores">📋 Labores & Gantt</div>
+    <div class="nav-item" data-page="costos">💰 Costos</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Config</div>
+    <div class="nav-item" data-page="estaciones">📡 Estaciones</div>
+    <div class="nav-item" data-page="campos_config">🗺️ Campos</div>
+    <div class="nav-item" data-page="alertas">🔔 Alertas</div>
+    <div class="nav-item" data-page="exportar">📤 Exportar</div>
+    <div class="nav-item" data-page="mi_config">⚙️ Mi Config</div>
+    <div class="nav-item" data-page="usuarios">👥 Usuarios</div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-pill">
+      <div class="avatar" id="av">?</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;" id="uname">—</div>
+        <div style="font-size:10px;color:var(--text3);" id="urole">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="main">
+  <div id="topbar">
+    <span class="page-title" id="ptitle">Dashboard</span>
+    <span id="upd-badge" style="font-size:10px;color:var(--text3);">—</span>
+    <span class="tbadge tb-green" id="status-badge">● —</span>
+    <button class="tbtn" onclick="loadAll()">↻ Actualizar</button>
+    <select id="season-sel" class="sel" onchange="loadAll()">
+      <option value="2026">2026/27</option>
+      <option value="2025">2025/26</option>
+      <option value="2024">2024/25</option>
+      <option value="2023">2023/24</option>
+    </select>
+    <button class="tbtn" onclick="doLogout()" style="color:var(--red);">Salir</button>
+  </div>
+  <div id="content"><div class="loading"><div class="spinner"></div>Iniciando...</div></div>
+</div>
+</div>
+
+<script>
+// ================================================================
+// CONFIG
+// ================================================================
+const SB_URL = 'https://kysyovhjlzrsfbptcfli.supabase.co';
+const SB_KEY = 'sb_publishable_2WKV1WxA1tdy6f0KJbqFBw_1kZwN6cK';
+
+// ================================================================
+// STATE — only real data from DB, nothing invented
+// ================================================================
+let SESSION = null;
+let WEATHER = null;
+let CHARTS  = {};
+let PAGE    = 'dashboard';
+// DB tables cached
+let ALL_USERS    = [];
+let CHILL_ROWS   = []; // all chill_readings rows
+let CAMPOS       = [];
+let CUARTELES    = [];
+let FRIO_CAMPOS  = [];
+let GD_CAMPOS    = [];
+let PODA_DATA    = [];
+let PROD_DATA    = [];
+let FEN_DATA     = [];
+let LABORES_DATA = [];
+let HIDDEN_CAMPOS_FRIOGD = new Set(); // ids de campos ocultos en la vista Frio & GD
+
+// ================================================================
+// HELPERS
+// ================================================================
+function yr()   { return parseInt(document.getElementById('season-sel').value); }
+function szn()  { const y=yr(); return `${y}/${String(y+1).slice(-2)}`; }
+function fmt(v,d=1,u='') { return (v===null||v===undefined) ? '—' : (typeof v==='number'?v.toFixed(d):v)+u; }
+function el(id) { return document.getElementById(id); }
+function getAllReadings() { return WEATHER?.current_readings||[]; }
+function myProfile()     { return SESSION?.profile||{}; }
+function myChillLatest() {
+  const uid = myProfile().id;
+  return CHILL_ROWS.filter(c=>c.usuario_id===uid).sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at))[0]||null;
+}
+function myChillPrev() {
+  const uid = myProfile().id;
+  const prevYr = yr()-1;
+  return CHILL_ROWS.filter(c=>c.usuario_id===uid&&new Date(c.recorded_at).getFullYear()===prevYr)
+    .sort((a,b)=>b.acumulado-a.acumulado)[0]||null;
+}
+
+// ---- Helpers por CAMPO (frío / GD / estación en vivo) ----
+function campoTieneEstacionConfigurada(c) {
+  if (!c) return false;
+  if (c.estacion_tipo==='davis') return !!(c.davis_station_id && c.davis_api_key && c.davis_api_secret);
+  return !!c.agroclima_codigo;
+}
+function frioAcumCampo(campoId, year, modeloField) {
+  const rows = FRIO_CAMPOS.filter(f=>f.campo_id===campoId&&f.year===year);
+  if (!rows.length) return null;
+  return rows.reduce((s,r)=>s+(r[modeloField]||0),0);
+}
+function gdAcumCampo(campoId, year) {
+  const rows = GD_CAMPOS.filter(g=>g.campo_id===campoId&&g.year===year);
+  if (!rows.length) return null;
+  return rows.slice(-1)[0]?.gd_acum ?? null;
+}
+function readingForCampo(c, rdgs) {
+  return rdgs.find(r =>
+    (c.estacion_tipo==='davis' && c.davis_station_id && String(r.station_id)===String(c.davis_station_id)) ||
+    (c.estacion_tipo!=='davis' && c.agroclima_codigo && String(r.station_id)===String(c.agroclima_codigo)) ||
+    r.station_name===c.nombre
+  ) || null;
+}
+
+// ================================================================
+// SUPABASE
+// ================================================================
+async function sb(method, table, body=null, query='') {
+  const h = {'apikey':SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+  if (SESSION?.access_token) h['Authorization'] = 'Bearer '+SESSION.access_token;
+  const r = await fetch(`${SB_URL}/rest/v1/${table}${query}`, {
+    method, headers:h, body: body?JSON.stringify(body):null
+  });
+  if (r.status===401) { showLogin(); throw new Error('Unauthorized'); }
+  const t = await r.text();
+  const data = t ? JSON.parse(t) : [];
+  if (!r.ok) {
+    const msg = data?.message || data?.error_description || data?.error || `Error ${r.status}`;
+    alert('⚠️ Error al guardar: '+msg);
+    throw new Error(msg);
+  }
+  return data;
+}
+async function sbAuth(ep, body) {
+  const r = await fetch(`${SB_URL}/auth/v1/${ep}`, {
+    method:'POST',
+    headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  return r.json();
+}
+
+// ================================================================
+// LOAD ALL — only real data
+// ================================================================
+async function loadAll() {
+  if (!SESSION) { showLogin(); return; }
+  const y = yr();
+  try {
+    const [snap,chills,users,campos,cuarteles,frio,gd,poda,prod,fen,labores] = await Promise.all([
+      sb('GET','weather_snapshots?order=created_at.desc&limit=1'),
+      sb('GET','chill_readings?order=recorded_at.desc&limit=500'),
+      sb('GET','usuarios?active=eq.true&order=nombre'),
+      sb('GET','campos_prod?activo=eq.true&order=nombre'),
+      sb('GET','cuarteles_prod?activo=eq.true&order=campo_id,nombre'),
+      sb('GET',`frio_campo?year=in.(${y},${y-1})&order=campo_id,quincena`),
+      sb('GET',`grados_dia_campo?year=in.(${y},${y-1})&order=campo_id,fecha`),
+      sb('GET','poda_prod?order=cuartel_id,year'),
+      sb('GET','produccion_prod?order=cuartel_id,year'),
+      sb('GET','fenologia_prod?order=cuartel_id,year'),
+      sb('GET','labores?order=fecha_inicio.asc').catch(()=>[]),
+    ]);
+
+    if (snap&&snap[0]) WEATHER = snap[0].payload;
+    ALL_USERS    = users||[];
+    CHILL_ROWS   = chills||[];
+    CAMPOS       = campos||[];
+    CUARTELES    = cuarteles||[];
+    FRIO_CAMPOS  = frio||[];
+    GD_CAMPOS    = gd||[];
+    PODA_DATA    = poda||[];
+    PROD_DATA    = prod||[];
+    FEN_DATA     = fen||[];
+    LABORES_DATA = labores||[];
+
+    // Chill by user (latest per user)
+    const rdgs = getAllReadings();
+    const ok   = rdgs.filter(r=>r.temp_c!==null).length;
+    el('upd-badge').textContent   = WEATHER?.updated_at_human||'Sin datos';
+    el('status-badge').textContent = `● ${ok}/${rdgs.length} estaciones`;
+    el('status-badge').className   = 'tbadge '+(ok===rdgs.length?'tb-green':ok>0?'tb-amber':'tb-red');
+
+    renderPage();
+  } catch(e) {
+    console.error('loadAll:', e);
+    el('status-badge').textContent = '● Error';
+    el('status-badge').className   = 'tbadge tb-red';
+  }
+}
+
+// ================================================================
+// NAV
+// ================================================================
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    PAGE = item.dataset.page;
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    item.classList.add('active');
+    const titles = {
+      dashboard:'Dashboard',clima:'Clima & Alertas',frio:'Frío & Grados Día',
+      poda:'Poda & Vigor',produccion:'Producción & Comparativo',
+      fenologia:'Estado Fenológico',labores:'Labores & Carta Gantt',costos:'Costos',
+      estaciones:'Estaciones',campos_config:'Campos',alertas:'Alertas',
+      exportar:'Exportar Datos',mi_config:'Mi Configuración',usuarios:'Usuarios'
+    };
+    el('ptitle').textContent = titles[PAGE]||PAGE;
+    destroyCharts();
+    renderPage();
+  });
+});
+
+function renderPage() {
+  if (!SESSION) { showLogin(); return; }
+  const pages = {dashboard,clima,frio,poda,produccion,fenologia,labores,costos,
+    estaciones,campos_config,alertas,exportar,mi_config,usuarios};
+  if (pages[PAGE]) pages[PAGE]();
+}
+
+function destroyCharts() {
+  Object.values(CHARTS).forEach(c=>{try{c.destroy();}catch(e){}});
+  CHARTS={};
+}
+
+// ================================================================
+// AUTH
+// ================================================================
+function showLogin() {
+  el('content').innerHTML = `
+  <div style="max-width:380px;margin:50px auto;">
+    <div class="card" style="padding:28px;">
+      <div style="text-align:center;margin-bottom:22px;">
+        <div style="font-size:36px;">🌿</div>
+        <div style="font-size:18px;font-weight:700;color:var(--green);">AgroSuite</div>
+        <div style="font-size:11px;color:var(--text3);">Gestión agrícola inteligente</div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" id="tab-li" onclick="swTab('login')">Iniciar sesión</div>
+        <div class="tab" id="tab-rg" onclick="swTab('register')">Crear cuenta</div>
+      </div>
+      <div id="form-login">
+        <div style="margin-bottom:10px;"><label>Email</label>
+          <input id="li-e" type="email" placeholder="tu@email.cl"></div>
+        <div style="margin-bottom:14px;"><label>Contraseña</label>
+          <input id="li-p" type="password" placeholder="••••••••"
+            onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <button class="btn-primary" onclick="doLogin()">Entrar</button>
+        <div id="li-err" style="display:none;color:var(--red);font-size:11px;margin-top:8px;text-align:center;"></div>
+      </div>
+      <div id="form-register" style="display:none;">
+        <div style="display:grid;gap:8px;margin-bottom:14px;">
+          <div><label>Nombre</label><input id="rg-n" type="text"></div>
+          <div><label>Email</label><input id="rg-e" type="email"></div>
+          <div><label>Contraseña (min. 6 caracteres)</label><input id="rg-p" type="password"></div>
+          <div><label>Rol</label>
+            <select id="rg-r"><option>Agrónomo Jefe</option><option>Técnico Agrícola</option><option>Encargado Campo</option></select></div>
+          <div><label>Modelo de frío</label>
+            <select id="rg-m">
+              <option value="utah">Dynamic Model Utah (Erez & Fishman, 1977)</option>
+              <option value="horas">Horas Frío (Weinberger, 1950)</option>
+              <option value="richardson">Richardson Modificado (1974)</option>
+            </select></div>
+        </div>
+        <button class="btn-primary" onclick="doRegister()">Crear cuenta</button>
+        <div id="rg-err" style="display:none;color:var(--red);font-size:11px;margin-top:8px;text-align:center;"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function swTab(t) {
+  el('tab-li').classList.toggle('active',t==='login');
+  el('tab-rg').classList.toggle('active',t==='register');
+  el('form-login').style.display    = t==='login'?'':'none';
+  el('form-register').style.display = t==='register'?'':'none';
+}
+
+async function doLogin() {
+  const email=el('li-e').value, pass=el('li-p').value;
+  if(!email||!pass) return;
+  const data = await sbAuth('token?grant_type=password',{email,password:pass});
+  if (!data.access_token) {
+    el('li-err').textContent = data.error_description||'Credenciales incorrectas';
+    el('li-err').style.display=''; return;
+  }
+  SESSION = data;
+  localStorage.setItem('sb_session',JSON.stringify(data));
+  await loadProfile();
+  await loadAll();
+}
+
+async function doRegister() {
+  const nombre=el('rg-n').value, email=el('rg-e').value, pass=el('rg-p').value;
+  const rol=el('rg-r').value, modelo=el('rg-m').value;
+  if(!nombre||!email||!pass){ el('rg-err').textContent='Completa todos los campos';el('rg-err').style.display='';return; }
+  const auth = await sbAuth('signup',{email,password:pass});
+  if (auth.error){ el('rg-err').textContent=auth.error.message;el('rg-err').style.display='';return; }
+  const sess = auth.session||auth;
+  if (!sess?.access_token) {
+    el('rg-err').style.cssText='display:block;color:var(--green);';
+    el('rg-err').textContent='✅ Revisa tu email para confirmar, luego inicia sesión.';
+    swTab('login'); return;
+  }
+  SESSION=sess; localStorage.setItem('sb_session',JSON.stringify(sess));
+  try { await sb('POST','usuarios',{nombre,email,password_hash:'(supabase-auth)',rol,modelo_frio:modelo}); } catch(e){}
+  await loadProfile(); await loadAll();
+}
+
+function doLogout() {
+  SESSION=null; localStorage.removeItem('sb_session');
+  WEATHER=null; ALL_USERS=[];
+  showLogin();
+}
+
+async function loadProfile() {
+  if (!SESSION) return;
+  const email = SESSION.user?.email||SESSION.email;
+  if (!email) return;
+  try {
+    const rows = await sb('GET',`usuarios?email=eq.${encodeURIComponent(email)}&limit=1`);
+    if (rows&&rows[0]) {
+      SESSION.profile = rows[0];
+      const u=rows[0];
+      el('av').textContent    = u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      el('uname').textContent = u.nombre;
+      el('urole').textContent = u.rol;
+    }
+  } catch(e) { console.warn('loadProfile:',e); }
+}
+
+// ================================================================
+// DASHBOARD
+// ================================================================
+function dashboard() {
+  const y   = yr();
+  const rdgs = getAllReadings();
+
+  const stationList = CAMPOS.map(c=>{
+    const r = readingForCampo(c, rdgs);
+    return r ? {...r, station_name:r.station_name||c.nombre} : {
+      station_name:c.nombre,
+      source:c.estacion_tipo==='davis'?'Davis WeatherLink':'Agroclima',
+      temp_c:null, humidity_pct:null, wind_speed_kmh:null, rain_mm:null
+    };
+  });
+  const matched = new Set(CAMPOS.map(c=>readingForCampo(c, rdgs)).filter(Boolean));
+  const extraStations = rdgs.filter(r => !matched.has(r));
+  const allStationTiles = [...stationList, ...extraStations];
+
+  const FRIO_MODELOS = [
+    {value:'horas_frio',   label:'Horas Frío'},
+    {value:'richardson',   label:'Richardson Mod.'},
+    {value:'dynamic_model',label:'Dynamic Model Utah'},
+  ];
+
+  el('content').innerHTML = `
+  <div class="g4" style="margin-bottom:14px;">
+    <div class="metric m-frost">
+      <div class="metric-label">❄️ Frío acumulado por campo</div>
+      <div style="display:flex;gap:4px;margin-bottom:4px;">
+        <select class="sel" id="dash-frio-campo" onchange="updateDashFrio()" style="flex:1;font-size:10px;">
+          ${CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('')}
+        </select>
+        <select class="sel" id="dash-frio-model" onchange="updateDashFrio()" style="flex:1;font-size:10px;">
+          ${FRIO_MODELOS.map(m=>`<option value="${m.value}">${m.label}</option>`).join('')}
+        </select>
+      </div>
+      <div id="dash-frio-body"></div>
+    </div>
+    <div class="metric m-purple">
+      <div class="metric-label">🌡️ GD acumulados</div>
+      <div style="margin-bottom:4px;">
+        <select class="sel" id="dash-gd-campo" onchange="updateDashGD()" style="width:100%;font-size:10px;">
+          ${CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <div id="dash-gd-body"></div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">🌡️ Temperatura por estación</div>
+      ${allStationTiles.map(r=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+          <span style="font-size:10px;color:var(--text2);">${r.station_name||r.source}</span>
+          <span style="font-weight:700;font-size:12px;color:${(r.temp_c||0)<=0?'var(--frost)':(r.temp_c||0)<=7?'var(--amber)':'var(--text)'};">
+            ${r.temp_c!==null&&r.temp_c!==undefined?fmt(r.temp_c,1)+'°C':'Sin señal'}
+          </span>
+        </div>`).join('')||'<span class="empty">Sin lecturas</span>'}
+    </div>
+    <div class="metric">
+      <div class="metric-label">🌧️ Lluvia</div>
+      <div id="dash-lluvia-body"><div style="font-size:10px;color:var(--text3);">Calculando…</div></div>
+    </div>
+  </div>
+
+  <div class="g2" style="margin-bottom:14px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">❄️ Frío acumulado — usuarios</div></div>
+      ${ALL_USERS.map(u=>{
+        const c=CHILL_ROWS.filter(x=>x.usuario_id===u.id).sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at))[0];
+        const estacionLabel = u.estacion_tipo==='davis'
+          ? `Davis ${u.davis_station_id||'?'}`
+          : `Agroclima ${u.agroclima_nombre||u.agroclima_codigo||'?'}`;
+        return `<div class="stat-row">
+          <div class="avatar" style="width:26px;height:26px;font-size:10px;flex-shrink:0;">${u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+          <div style="flex:1;"><div style="font-size:11px;font-weight:600;">${u.nombre}</div>
+            <div style="font-size:10px;color:var(--text3);">${c?.label||u.modelo_frio||'—'} · 📡 ${estacionLabel}</div></div>
+          <div style="text-align:right;">
+            <div style="font-size:14px;font-weight:700;color:var(--frost);">${fmt(c?.acumulado,1)}</div>
+            <div style="font-size:10px;color:var(--text3);">+${fmt(c?.diario,1)} hoy</div>
+          </div>
+        </div>`;
+      }).join('')||'<div class="empty">Sin usuarios</div>'}
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📡 Estaciones en tiempo real</div></div>
+      ${allStationTiles.map(r=>`
+        <div class="stat-row">
+          <span class="dot ${r.temp_c!==null&&r.temp_c!==undefined?'dot-green':'dot-red'}"></span>
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:600;">${r.station_name||r.source}</div>
+            <div style="font-size:10px;color:var(--text3);">${r.source}</div>
+          </div>
+          ${r.temp_c!==null&&r.temp_c!==undefined?`
+          <div style="display:grid;grid-template-columns:repeat(4,55px);gap:3px;font-size:10px;text-align:right;">
+            <div>🌡️ <b>${fmt(r.temp_c,1)}°</b></div>
+            <div>💧 <b>${fmt(r.humidity_pct,0)}%</b></div>
+            <div>💨 <b>${fmt(r.wind_speed_kmh,1)}</b></div>
+            <div>🌧️ <b>${fmt(r.rain_mm,1)}mm</b></div>
+          </div>`:'<span class="tbadge tb-red">Sin señal</span>'}
+        </div>`).join('')||'<div class="empty">Sin lecturas — ejecuta el scheduler</div>'}
+    </div>
+  </div>`;
+
+  updateDashFrio();
+  updateDashGD();
+  updateDashLluvia();
+}
+
+function updateDashFrio() {
+  const campoId = parseInt(el('dash-frio-campo')?.value);
+  const modelo  = el('dash-frio-model')?.value || 'horas_frio';
+  const c = CAMPOS.find(x=>x.id===campoId);
+  const y = yr();
+  const body = el('dash-frio-body');
+  if (!body || !c) return;
+  if (!campoTieneEstacionConfigurada(c)) {
+    body.innerHTML = `<div style="font-size:10px;color:var(--red);">Sin estación configurada para ${c?.nombre||'este campo'} — revisa Campos → ⚙️ Estación</div>`;
+    return;
+  }
+  const acum = frioAcumCampo(campoId, y, modelo);
+  const acumPrev = frioAcumCampo(campoId, y-1, modelo);
+  if (acum===null) {
+    body.innerHTML = `<div style="font-size:10px;color:var(--text3);">Sin datos de frío para ${c.nombre} en ${szn()} — falta correr agrosuite_campos_sync.py</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="metric-val">${fmt(acum,1)}</div>
+    <div class="metric-sub">T. anterior: ${acumPrev===null?'sin datos':fmt(acumPrev,1)}</div>`;
+}
+
+function updateDashGD() {
+  const campoId = parseInt(el('dash-gd-campo')?.value);
+  const c = CAMPOS.find(x=>x.id===campoId);
+  const y = yr();
+  const body = el('dash-gd-body');
+  if (!body || !c) return;
+  if (!campoTieneEstacionConfigurada(c)) {
+    body.innerHTML = `<div style="font-size:10px;color:var(--red);">Sin estación configurada para ${c?.nombre||'este campo'} — revisa Campos → ⚙️ Estación</div>`;
+    return;
+  }
+  const gd = gdAcumCampo(campoId, y);
+  const gdPrev = gdAcumCampo(campoId, y-1);
+  if (gd===null) {
+    body.innerHTML = `<div style="font-size:10px;color:var(--text3);">Sin datos de GD para ${c.nombre} — falta correr agrosuite_campos_sync.py</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="metric-val">${fmt(gd,1)}</div>
+    <div class="metric-sub">Base ${c.base_grados_dia||10.2}°C · desde 15/8</div>
+    <div class="metric-sub">T. anterior: ${gdPrev===null?'sin datos':fmt(gdPrev,1)}</div>`;
+}
+
+async function updateDashLluvia() {
+  const body = el('dash-lluvia-body');
+  if (!body) return;
+  const hoy = new Date();
+  const yearStart = `${hoy.getFullYear()}-01-01`;
+  let rows = [];
+  try {
+    rows = await sb('GET', `station_readings?recorded_at=gte.${yearStart}&select=station_name,rain_mm,recorded_at&order=recorded_at.asc&limit=20000`);
+  } catch(e) {
+    body.innerHTML = `<div style="font-size:10px;color:var(--red);">No se pudo calcular lluvia acumulada</div>`;
+    return;
+  }
+  // Por estación y día calendario nos quedamos con el máximo rain_mm del día
+  // (es un acumulado-del-día que se reinicia a medianoche), y sumamos esos
+  // máximos diarios — sumar directamente todas las lecturas horarias
+  // sobrecontaría, porque cada una ya es el acumulado del día hasta esa hora.
+  const porDia = {};
+  rows.forEach(r=>{
+    if (r.rain_mm===null || r.rain_mm===undefined) return;
+    const fecha = r.recorded_at.slice(0,10);
+    porDia[r.station_name] = porDia[r.station_name] || {};
+    porDia[r.station_name][fecha] = Math.max(porDia[r.station_name][fecha]||0, r.rain_mm);
+  });
+  const mesActual = hoy.toISOString().slice(0,7);
+  const hoyStr = hoy.toISOString().slice(0,10);
+  const estaciones = Object.keys(porDia);
+  if (!estaciones.length) {
+    body.innerHTML = `<div style="font-size:10px;color:var(--text3);">Sin historial de lluvia guardado aún</div>`;
+    return;
+  }
+  body.innerHTML = estaciones.map(name=>{
+    const dias = porDia[name];
+    const fechas = Object.keys(dias);
+    const lluviaHoy = dias[hoyStr] ?? null;
+    const mesAcum = fechas.filter(f=>f.slice(0,7)===mesActual).reduce((s,f)=>s+dias[f],0);
+    const anioAcum = fechas.reduce((s,f)=>s+dias[f],0);
+    return `<div style="margin-bottom:6px;">
+      <div style="font-size:10px;font-weight:600;color:var(--text2);">${name}</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;gap:4px;">
+        <span>Hoy: <b>${lluviaHoy===null?'—':fmt(lluviaHoy,1)+'mm'}</b></span>
+        <span>Mes: <b>${fmt(mesAcum,1)}mm</b></span>
+        <span>Año: <b>${fmt(anioAcum,1)}mm</b></span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ================================================================
+// CLIMA
+// ================================================================
+function clima() {
+  const rdgs   = getAllReadings();
+  const p      = myProfile();
+  const thr    = p.thresholds||{frost_leve:-2,frost_moderada:-4,frost_severa:-6,rain_alert_mm:15};
+  const allSt  = [...rdgs,...CAMPOS.filter(c=>!rdgs.some(r=>r.station_name===c.nombre))
+    .map(c=>({station_name:c.nombre,source:c.estacion_tipo==='davis'?'Davis':'Agroclima',temp_c:null,humidity_pct:null,wind_speed_kmh:null,rain_mm:null}))];
+
+  el('content').innerHTML = `
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header">
+      <div class="card-title">📡 Estación observada</div>
+      <select class="sel" id="clima-st-sel" onchange="updateClimaStation()">
+        ${allSt.map((r,i)=>`<option value="${i}">${r.station_name||r.source}</option>`).join('')}
+      </select>
+    </div>
+    <div id="clima-readings" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+      ${renderStationTiles(allSt[0]||{})}
+    </div>
+  </div>
+  <div class="g2" style="margin-bottom:14px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">🧊 Umbrales de helada</div></div>
+      <div class="alert a-amber">
+        <span style="font-size:16px;">⚠️</span>
+        <div><div class="alert-title">Pronóstico basado en datos de estaciones</div>
+          <div style="color:var(--text);">Umbrales: Leve ${thr.frost_leve}°C · Moderada ${thr.frost_moderada}°C · Severa ${thr.frost_severa}°C</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px;">Temperatura actual: ${fmt(allSt[0]?.temp_c,1,'°C')}</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🌧️ Lluvia</div></div>
+      ${allSt.map(r=>`
+        <div class="stat-row">
+          <div style="font-size:11px;font-weight:600;flex:1;">${r.station_name||r.source}</div>
+          <div style="font-weight:700;color:${(r.rain_mm||0)>thr.rain_alert_mm?'var(--red)':'var(--text)'};">${fmt(r.rain_mm,1,'mm')}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Datos actuales por estación</div></div>
+    <table>
+      <thead><tr><th>Estación</th><th>Fuente</th><th>T°C</th><th>HR%</th><th>Viento</th><th>Lluvia</th><th>Pt. Rocío</th><th>Rad. Solar</th></tr></thead>
+      <tbody>${allSt.map(r=>`<tr>
+        <td style="font-weight:600;"><span class="dot ${r.temp_c!==null?'dot-green':'dot-red'}"></span>${r.station_name||r.source}</td>
+        <td style="font-size:10px;">${r.source}</td>
+        <td style="color:${(r.temp_c||0)<=0?'var(--frost)':(r.temp_c||0)<=7?'var(--amber)':'var(--text)'};">${fmt(r.temp_c,1)}</td>
+        <td>${fmt(r.humidity_pct,1)}</td>
+        <td>${fmt(r.wind_speed_kmh,1,' km/h')}</td>
+        <td style="color:${(r.rain_mm||0)>5?'var(--blue)':''};">${fmt(r.rain_mm,1,' mm')}</td>
+        <td>${fmt(r.dew_point_c,1)}</td>
+        <td>${fmt(r.solar_rad_wm2,0,' W/m²')}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderStationTiles(r) {
+  return [['🌡️','Temperatura',fmt(r.temp_c,1,'°C')],['💧','Humedad',fmt(r.humidity_pct,1,'%')],
+    ['💨','Viento',fmt(r.wind_speed_kmh,1,' km/h')],['🌧️','Lluvia',fmt(r.rain_mm,1,' mm')]
+  ].map(([i,l,v])=>`<div style="background:var(--bg);border-radius:var(--r);padding:8px;text-align:center;">
+    <div style="font-size:10px;color:var(--text2);margin-bottom:3px;">${i} ${l}</div>
+    <div style="font-size:15px;font-weight:700;">${v}</div></div>`).join('');
+}
+
+function updateClimaStation() {
+  const allSt = [...getAllReadings(),...CAMPOS.filter(c=>!getAllReadings().some(r=>r.station_name===c.nombre))
+    .map(c=>({station_name:c.nombre,source:c.estacion_tipo==='davis'?'Davis':'Agroclima',temp_c:null,humidity_pct:null,wind_speed_kmh:null,rain_mm:null}))];
+  const idx = parseInt(el('clima-st-sel')?.value||0);
+  const wrap = el('clima-readings');
+  if (wrap) wrap.innerHTML = renderStationTiles(allSt[idx]||{});
+}
+
+// ================================================================
+// FRÍO & GD
+// ================================================================
+function frio() {
+  const y = yr();
+
+  el('content').innerHTML = `
+  <div class="tabs">
+    <div class="tab active" id="tab-frio" onclick="switchFrioTab('frio')">❄️ Porciones de Frío</div>
+    <div class="tab" id="tab-gd" onclick="switchFrioTab('gd')">🌡️ Grados Día</div>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><div class="card-title">👁️ Campos visibles</div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+      ${CAMPOS.map(c=>`
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+          <input type="checkbox" ${HIDDEN_CAMPOS_FRIOGD.has(c.id)?'':'checked'} onchange="toggleCampoFrioGD(${c.id})">
+          ${c.nombre}
+        </label>`).join('')}
+    </div>
+  </div>
+  <div id="panel-frio">
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <div class="card-title">❄️ Frío acumulado por campo — ${szn()}</div>
+        <select class="sel" id="frio-modelo" onchange="updateFrioTable()">
+          <option value="horas_frio">Horas Frío (Weinberger, 1950)</option>
+          <option value="richardson">Richardson Modificado (1974)</option>
+          <option value="dynamic_model">Dynamic Model Utah (Erez & Fishman, 1977)</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Campo</th><th>Estación</th>
+          <th>1ª May</th><th>1ª Jun</th><th>2ª Jun</th><th>1ª Jul</th><th>2ª Jul</th>
+          <th>Total ${y}</th><th>Total ${y-1}</th><th>Δ</th></tr></thead>
+        <tbody id="frio-tbody"></tbody>
+      </table>
+      </div>
+      <div style="margin-top:12px;"><canvas id="frioChart" style="height:220px;"></canvas></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:4px;">Línea sólida: ${szn()} (acumulado por quincena) · línea punteada: temporada anterior</div>
+    </div>
+  </div>
+  <div id="panel-gd" style="display:none;">
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><div class="card-title">🌡️ Grados Día acumulados por campo — Base 10.2°C · desde 15/8</div></div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Campo</th><th>Estación</th><th>GD acum. ${y}</th><th>GD acum. ${y-1}</th><th>Δ</th></tr></thead>
+        <tbody id="gd-tbody"></tbody>
+      </table>
+      </div>
+      <div style="margin-top:12px;"><canvas id="gdChart" style="height:220px;"></canvas></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:4px;">Acumulación diaria de grados-día, temporada ${szn()}</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Último dato diario por campo</div></div>
+      <table>
+        <thead><tr><th>Campo</th><th>Fecha</th><th>T.Max</th><th>T.Min</th><th>T.Media</th><th>GD día</th><th>GD acum.</th></tr></thead>
+        <tbody>${CAMPOS.map(c=>{
+          const gd=GD_CAMPOS.filter(g=>g.campo_id===c.id&&g.year===y).slice(-1)[0];
+          return `<tr>
+            <td style="font-weight:600;">${c.nombre}</td>
+            ${gd?`<td>${gd.fecha}</td><td>${fmt(gd.tmax,1)}°C</td><td>${fmt(gd.tmin,1)}°C</td>
+              <td>${fmt(gd.tmedia,1)}°C</td>
+              <td style="color:var(--amber);font-weight:600;">${fmt(gd.gd_dia,2)}</td>
+              <td style="color:var(--purple);font-weight:700;">${fmt(gd.gd_acum,1)}</td>`
+            :`<td colspan="6" style="color:var(--text3);font-size:10px;">Sin datos — ejecuta: python agrosuite_campos_sync.py</td>`}
+          </tr>`;
+        }).join('')||'<tr><td colspan="7" class="empty">Sin campos</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  setTimeout(()=>{ updateFrioTable(); updateGDView(); }, 50);
+}
+
+function toggleCampoFrioGD(campoId) {
+  if (HIDDEN_CAMPOS_FRIOGD.has(campoId)) HIDDEN_CAMPOS_FRIOGD.delete(campoId);
+  else HIDDEN_CAMPOS_FRIOGD.add(campoId);
+  updateFrioTable();
+  updateGDView();
+}
+
+function updateFrioTable() {
+  const QORD   = ['Q1_mayo','Q1_junio','Q2_junio','Q1_julio','Q2_julio'];
+  const modelo = el('frio-modelo')?.value || 'horas_frio';
+  const tbody  = el('frio-tbody');
+  if (!tbody) return;
+  const y = yr();
+  const visibles = CAMPOS.filter(c=>!HIDDEN_CAMPOS_FRIOGD.has(c.id));
+
+  tbody.innerHTML = visibles.map(c=>{
+    const cf = FRIO_CAMPOS.filter(f=>f.campo_id===c.id&&f.year===y);
+    let acum = 0;
+    const vals = QORD.map(q=>{
+      const qd=cf.find(f=>f.quincena===q);
+      const v=(qd?qd[modelo]:null)||null;
+      if(v!==null) acum+=v;
+      return v;
+    });
+    const acumPrev = frioAcumCampo(c.id, y-1, modelo);
+    const delta = acumPrev!==null && acum>0 ? acum-acumPrev : null;
+    return `<tr>
+      <td style="font-weight:600;">${c.nombre}</td>
+      <td style="font-size:10px;color:var(--text3);">${c.estacion_tipo==='davis'?'Davis':'Agroclima'}</td>
+      ${vals.map(v=>`<td style="color:var(--frost);font-weight:${v?'700':'400'};">${v!==null?v.toFixed(1):'—'}</td>`).join('')}
+      <td style="color:var(--green);font-weight:700;">${acum>0?acum.toFixed(1):'—'}</td>
+      <td style="color:var(--text2);">${acumPrev!==null?acumPrev.toFixed(1):'sin datos'}</td>
+      <td style="font-weight:700;color:${delta===null?'var(--text3)':delta>=0?'var(--green)':'var(--red)'};">${delta===null?'—':(delta>=0?'+':'')+delta.toFixed(1)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="empty">Sin campos visibles</td></tr>';
+
+  buildFrioChart(modelo, visibles);
+}
+
+function buildFrioChart(modelo, visibles) {
+  const ctx = el('frioChart');
+  if (!ctx) return;
+  if (CHARTS.frio) CHARTS.frio.destroy();
+  const y = yr();
+  const QORD = ['Q1_mayo','Q1_junio','Q2_junio','Q1_julio','Q2_julio'];
+  const QLAB = ['1ª May','1ª Jun','2ª Jun','1ª Jul','2ª Jul'];
+  const colors = ['#2471a3','#2d6a2d','#c0392b','#8a6200','#7c3aed','#0891b2'];
+
+  const datasets = [];
+  visibles.forEach((c,i)=>{
+    const col = colors[i%colors.length];
+    const cfCurr = FRIO_CAMPOS.filter(f=>f.campo_id===c.id&&f.year===y);
+    let acum=0;
+    const curr = QORD.map(q=>{
+      const qd=cfCurr.find(f=>f.quincena===q);
+      acum+=(qd?qd[modelo]:0)||0;
+      return qd&&qd[modelo]?Math.round(acum*10)/10:null;
+    });
+    if (curr.some(v=>v!==null)) {
+      datasets.push({label:c.nombre,data:curr,borderColor:col,backgroundColor:col+'20',
+        fill:false,tension:.4,borderWidth:2,pointRadius:4,spanGaps:false});
+    }
+    const cfPrev = FRIO_CAMPOS.filter(f=>f.campo_id===c.id&&f.year===y-1);
+    let acumP=0;
+    const prev = QORD.map(q=>{
+      const qd=cfPrev.find(f=>f.quincena===q);
+      acumP+=(qd?qd[modelo]:0)||0;
+      return qd&&qd[modelo]?Math.round(acumP*10)/10:null;
+    });
+    if (prev.some(v=>v!==null)) {
+      datasets.push({label:`${c.nombre} (T.${y-1})`,data:prev,borderColor:col,backgroundColor:'transparent',
+        borderDash:[5,4],fill:false,tension:.4,borderWidth:1.5,pointRadius:2,opacity:.6,spanGaps:false});
+    }
+  });
+
+  if (!datasets.length) return;
+  CHARTS.frio = new Chart(ctx,{type:'line',data:{labels:QLAB,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+      scales:{y:{min:0,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}},
+        x:{grid:{color:'rgba(0,100,200,.12)',lineWidth:1.5},ticks:{font:{size:10}}}}}});
+}
+
+function updateGDView() {
+  const tbody = el('gd-tbody');
+  if (!tbody) return;
+  const y = yr();
+  const visibles = CAMPOS.filter(c=>!HIDDEN_CAMPOS_FRIOGD.has(c.id));
+
+  tbody.innerHTML = visibles.map(c=>{
+    const gd = gdAcumCampo(c.id, y);
+    const gdPrev = gdAcumCampo(c.id, y-1);
+    const delta = gd!==null && gdPrev!==null ? gd-gdPrev : null;
+    return `<tr>
+      <td style="font-weight:600;">${c.nombre}</td>
+      <td style="font-size:10px;color:var(--text3);">${c.estacion_tipo==='davis'?'Davis':'Agroclima'}</td>
+      <td style="color:var(--purple);font-weight:700;">${gd!==null?fmt(gd,1):'sin datos'}</td>
+      <td style="color:var(--text2);">${gdPrev!==null?fmt(gdPrev,1):'sin datos'}</td>
+      <td style="font-weight:700;color:${delta===null?'var(--text3)':delta>=0?'var(--green)':'var(--red)'};">${delta===null?'—':(delta>=0?'+':'')+delta.toFixed(1)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">Sin campos visibles</td></tr>';
+
+  buildGDChart(visibles);
+}
+
+function buildGDChart(visibles) {
+  const ctx = el('gdChart');
+  if (!ctx) return;
+  if (CHARTS.gd) CHARTS.gd.destroy();
+  const y = yr();
+  const colors = ['#7c3aed','#2471a3','#2d6a2d','#c0392b','#8a6200','#0891b2'];
+
+  // Eje X común: todas las fechas con datos de GD para los campos visibles
+  const fechasSet = new Set();
+  visibles.forEach(c=>GD_CAMPOS.filter(g=>g.campo_id===c.id&&g.year===y).forEach(g=>fechasSet.add(g.fecha)));
+  const fechas = [...fechasSet].sort();
+
+  if (!fechas.length) { if(CHARTS.gd){CHARTS.gd.destroy();CHARTS.gd=null;} return; }
+
+  const datasets = visibles.map((c,i)=>{
+    const porFecha = {};
+    GD_CAMPOS.filter(g=>g.campo_id===c.id&&g.year===y).forEach(g=>{ porFecha[g.fecha]=g.gd_acum; });
+    return {label:c.nombre,data:fechas.map(f=>porFecha[f]??null),
+      borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'20',
+      fill:false,tension:.3,borderWidth:2,pointRadius:1,spanGaps:true};
+  }).filter(d=>d.data.some(v=>v!==null));
+
+  if (!datasets.length) return;
+  CHARTS.gd = new Chart(ctx,{type:'line',data:{labels:fechas.map(f=>f.slice(5)),datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+      scales:{y:{min:0,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}},
+        x:{grid:{display:false},ticks:{font:{size:9},maxRotation:60,autoSkip:true,maxTicksLimit:16}}}}});
+}
+
+function switchFrioTab(t) {
+  el('tab-frio').classList.toggle('active',t==='frio');
+  el('tab-gd').classList.toggle('active',t==='gd');
+  el('panel-frio').style.display = t==='frio'?'':'none';
+  el('panel-gd').style.display   = t==='gd'?'':'none';
+}
+
+// ================================================================
+// PODA & VIGOR
+// ================================================================
+function poda() {
+  const y = yr();
+  el('content').innerHTML = `
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">✂️ Poda & Vigor — T. ${szn()}</div>
+      <button class="tbtn tbtn-primary" onclick="addPoda()">+ Registrar</button>
+    </div>
+    ${CAMPOS.map(c=>{
+      const cq = CUARTELES.filter(q=>q.campo_id===c.id);
+      return `<div style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border);margin-bottom:6px;">🗺️ ${c.nombre}</div>
+        <div style="overflow-x:auto;">
+        <table style="min-width:800px;">
+          <thead><tr><th>Cuartel</th><th>Variedad</th><th>Sistema</th><th>Há</th><th>Pl/ha</th>
+            <th>Dardos/pl</th><th>Frutos/d</th><th>Intensidad</th><th>Vigor</th>
+            <th>Costo Poda/pl</th><th>Costo Amont./pl</th><th>Notas</th><th></th></tr></thead>
+          <tbody>${cq.map(q=>{
+            const pd=PODA_DATA.find(p=>p.cuartel_id===q.id&&p.year===y);
+            const vc=pd?.vigor==='Alto'?'var(--green)':pd?.vigor==='Medio'?'var(--amber)':pd?.vigor==='Bajo'?'var(--red)':'var(--text3)';
+            return `<tr>
+              <td style="font-weight:600;">${q.nombre}</td>
+              <td style="font-size:10px;">${q.variedad||'—'}</td>
+              <td style="font-size:10px;">${q.sistema||'—'}</td>
+              <td>${q.has||'—'}</td>
+              <td style="font-size:10px;">${q.n_plantas||1250}</td>
+              <td style="color:var(--frost);font-weight:700;">${pd?fmt(pd.conteo_dardos,1):'—'}</td>
+              <td style="color:var(--green);font-weight:700;">${pd?fmt(pd.flores_dardo,1):'—'}</td>
+              <td>${pd?.intensidad_pct!=null?`<div style="display:flex;align-items:center;gap:4px;">
+                <div class="bar" style="flex:1;"><div class="bar-fill" style="width:${pd.intensidad_pct}%;"></div></div>
+                <span style="font-size:10px;">${pd.intensidad_pct}%</span></div>`:'—'}</td>
+              <td style="color:${vc};font-weight:600;">${pd?.vigor||'—'}</td>
+              <td style="font-size:10px;">${pd?.costo_poda_pl?'$'+pd.costo_poda_pl.toLocaleString():'—'}</td>
+              <td style="font-size:10px;">${pd?.costo_amontonado_pl?'$'+pd.costo_amontonado_pl.toLocaleString():'—'}</td>
+              <td style="font-size:10px;color:var(--text3);max-width:120px;">${pd?.observaciones||'—'}</td>
+              <td><button class="tbtn" style="font-size:10px;padding:0 5px;" onclick="editPoda(${q.id})">✏️</button></td>
+            </tr>`;
+          }).join('')||`<tr><td colspan="13" class="empty">Sin cuarteles</td></tr>`}
+          </tbody>
+        </table></div>
+      </div>`;
+    }).join('')||'<div class="empty">Sin campos configurados</div>'}
+  </div>`;
+}
+
+async function editPoda(cuartel_id) {
+  const y = yr();
+  const q  = CUARTELES.find(c=>c.id===cuartel_id)||{};
+  const pd = PODA_DATA.find(p=>p.cuartel_id===cuartel_id&&p.year===y)||{};
+  showModal(`✏️ Poda — ${q.nombre||'Cuartel'} · ${szn()}`, `
+    <div style="display:grid;gap:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Dardos/planta</label><input id="ep-d" type="number" step="0.1" value="${pd.conteo_dardos||''}"></div>
+        <div><label>Frutos/dardo</label><input id="ep-f" type="number" step="0.1" value="${pd.flores_dardo||''}"></div>
+        <div><label>Intensidad %</label><input id="ep-i" type="number" min="0" max="100" value="${pd.intensidad_pct||''}"></div>
+        <div><label>Vigor</label>
+          <select id="ep-v">
+            <option value="">—</option>
+            <option value="Alto" ${pd.vigor==='Alto'?'selected':''}>Alto</option>
+            <option value="Medio" ${pd.vigor==='Medio'?'selected':''}>Medio</option>
+            <option value="Bajo" ${pd.vigor==='Bajo'?'selected':''}>Bajo</option>
+          </select></div>
+        <div><label>Costo Poda $/planta</label><input id="ep-cp" type="number" value="${pd.costo_poda_pl||''}"></div>
+        <div><label>Costo Amont. $/planta</label><input id="ep-ca" type="number" value="${pd.costo_amontonado_pl||''}"></div>
+      </div>
+      <div><label>Sistema</label>
+        <select id="ep-s">
+          ${['Espaldera','Parrón','KGB','UFO','Techo'].map(s=>`<option ${q.sistema===s?'selected':''}>${s}</option>`).join('')}
+        </select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label>DEH (m)</label><input id="ep-deh" type="number" step="0.1" value="${q.deh||''}"></div>
+        <div><label>DSH (m)</label><input id="ep-dsh" type="number" step="0.1" value="${q.dsh||''}"></div>
+        <div><label>Plantas/ha</label><input id="ep-pl" type="number" value="${q.n_plantas||1250}" placeholder="10000/(DEH×DSH)"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);">Plantas/ha = 10.000 / (DEH × DSH). Al ingresar DEH y DSH se calcula automáticamente.</div>
+      <div><label>Observaciones</label><input id="ep-n" type="text" value="${pd.observaciones||''}"></div>
+    </div>`,async()=>{
+    const deh=parseFloat(el('ep-deh').value)||null;
+    const dsh=parseFloat(el('ep-dsh').value)||null;
+    const n_plantas=deh&&dsh?Math.round(10000/(deh*dsh)):(parseInt(el('ep-pl').value)||q.n_plantas||1250);
+    await sb('PATCH',`cuarteles_prod?id=eq.${cuartel_id}`,{sistema:el('ep-s').value,deh,dsh,n_plantas});
+    const payload={
+      cuartel_id,campo_id:q.campo_id,year:y,
+      conteo_dardos:parseFloat(el('ep-d').value)||null,
+      flores_dardo:parseFloat(el('ep-f').value)||null,
+      intensidad_pct:parseFloat(el('ep-i').value)||null,
+      vigor:el('ep-v').value||null,
+      costo_poda_pl:parseFloat(el('ep-cp').value)||null,
+      costo_amontonado_pl:parseFloat(el('ep-ca').value)||null,
+      observaciones:el('ep-n').value||null,
+      usuario_id:myProfile().id,
+    };
+    if (pd.id) await sb('PATCH',`poda_prod?id=eq.${pd.id}`,payload);
+    else await sb('POST','poda_prod',payload);
+    await loadAll(); poda();
+  });
+}
+
+async function addPoda() {
+  const opts = CUARTELES.map(c=>{
+    const cp=CAMPOS.find(f=>f.id===c.campo_id);
+    return `<option value="${c.id}">${cp?.nombre||'?'} — ${c.nombre}</option>`;
+  }).join('');
+  showModal('Registrar Poda',`
+    <div style="display:grid;gap:8px;">
+      <div><label>Cuartel</label><select id="ap-c">${opts}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Dardos/planta</label><input id="ap-d" type="number" step="0.1"></div>
+        <div><label>Frutos/dardo</label><input id="ap-f" type="number" step="0.1"></div>
+        <div><label>Intensidad %</label><input id="ap-i" type="number" min="0" max="100"></div>
+        <div><label>Vigor</label><select id="ap-v"><option value="">—</option><option>Alto</option><option>Medio</option><option>Bajo</option></select></div>
+      </div>
+      <div><label>Observaciones</label><input id="ap-n" type="text"></div>
+    </div>`,async()=>{
+    const cid=parseInt(el('ap-c').value);
+    const c=CUARTELES.find(x=>x.id===cid);
+    await sb('POST','poda_prod',{cuartel_id:cid,campo_id:c?.campo_id,year:yr(),
+      conteo_dardos:parseFloat(el('ap-d').value)||null,
+      flores_dardo:parseFloat(el('ap-f').value)||null,
+      intensidad_pct:parseFloat(el('ap-i').value)||null,
+      vigor:el('ap-v').value||null,
+      observaciones:el('ap-n').value||null,
+      usuario_id:myProfile().id});
+    await loadAll(); poda();
+  });
+}
+
+// ================================================================
+function produccion() {
+  const y = yr();
+  const years = [y,y-1,y-2].filter(x=>x>=2023);
+  el('content').innerHTML = `
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header">
+      <div class="card-title">📦 Producción &amp; Comparativo · ${szn()}</div>
+      <button class="tbtn tbtn-primary" onclick="addProd()">+ Ingresar kg/ha</button>
+    </div>
+    ${CAMPOS.map(c=>{
+      const cq=CUARTELES.filter(q=>q.campo_id===c.id);
+      const frioTot=FRIO_CAMPOS.filter(f=>f.campo_id===c.id).reduce((s,f)=>s+(f.horas_frio||0),0);
+      const gdLast=GD_CAMPOS.filter(g=>g.campo_id===c.id).slice(-1)[0];
+      return `<div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border);margin-bottom:6px;display:flex;gap:12px;">
+          <span>🗺️ ${c.nombre}</span>
+          <span>❄️ HF ${y}: ${frioTot>0?frioTot.toFixed(0):'—'}</span>
+          <span>🌡️ GD: ${gdLast?fmt(gdLast.gd_acum,0):'—'}</span>
+        </div>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Cuartel</th><th>Variedad</th><th>Há</th><th>Pl/ha</th>
+            <th>Dardos/pl ${y}</th><th>Frutos/dardo ${y}</th>
+            <th>Frutos/dardo ${y-1}<br><span style="font-size:9px;font-weight:400;">calculado desde kg/ha real</span></th>
+            ${years.map(yx=>`<th>Kg/ha ${yx}/${String(yx+1).slice(-2)}</th>`).join('')}
+            <th>Δ kg/ha</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody>${cq.map(q=>{
+            const pd=PODA_DATA.find(p=>p.cuartel_id===q.id&&p.year===y);
+            const pdPrev=PODA_DATA.find(p=>p.cuartel_id===q.id&&p.year===y-1);
+            const prCurr=PROD_DATA.find(p=>p.cuartel_id===q.id&&p.year===y);
+            const prPrev=PROD_DATA.find(p=>p.cuartel_id===q.id&&p.year===y-1);
+            const prods=years.map(yx=>PROD_DATA.find(p=>p.cuartel_id===q.id&&p.year===yx));
+            const nPl=q.n_plantas||1250;
+            const plHa=(nPl/q.has);
+            // Frutos/dardo temporada anterior = kg/ha real ÷ (pl/ha × dardos × 0.011)
+            // — se despeja la fórmula de estimación al revés, usando el dato
+            // real de cosecha para saber cuántos frutos/dardo hubo de verdad.
+            const fdPrev=prPrev?.kg_ha&&pdPrev?.conteo_dardos&&q.has
+              ?(prPrev.kg_ha/(plHa*pdPrev.conteo_dardos*0.011)).toFixed(2)
+              :null;
+            const delta=prCurr?.kg_ha&&prPrev?.kg_ha?prCurr.kg_ha-prPrev.kg_ha:null;
+            // Estimado temporada actual = dardos/pl × pl/ha × 0.011 × frutos/dardo
+            // — solo se usa como respaldo mientras no hay kg/ha real ingresado.
+            const est=pd?.conteo_dardos&&pd?.flores_dardo
+              ?Math.round(pd.conteo_dardos*plHa*0.011*pd.flores_dardo)
+              :null;
+            return `<tr>
+              <td style="font-weight:600;border-left:3px solid var(--green);">${q.nombre}</td>
+              <td style="font-size:10px;">${q.variedad||'—'}</td>
+              <td>${q.has||'—'}</td>
+              <td style="font-size:10px;">${nPl}</td>
+              <td style="color:var(--frost);font-weight:700;">${pd?fmt(pd.conteo_dardos,1):'—'}</td>
+              <td style="color:var(--green);font-weight:700;">${pd?fmt(pd.flores_dardo,1):'—'}</td>
+              <td style="color:var(--amber);">${fdPrev||'—'}</td>
+              ${prods.map((p,i)=>{
+                const yx=years[i];
+                if (p) {
+                  return `<td style="color:${yx===y?'var(--green)':'var(--text)'};font-weight:${yx===y?'700':'400'};">
+                    ${fmt(p.kg_ha,0)}<div style="font-size:9px;color:var(--text3);">real ingresado</div></td>`;
+                }
+                if (yx===y && est) {
+                  return `<td style="color:var(--amber);font-style:italic;">
+                    ${est.toLocaleString()}<div style="font-size:9px;color:var(--text3);">estimado = dardos×pl/ha×0.011×frutos/dardo</div></td>`;
+                }
+                return `<td style="color:var(--text3);">—</td>`;
+              }).join('')}
+              <td style="font-weight:700;color:${delta===null?'var(--text3)':delta>=0?'var(--green)':'var(--red)'};">
+                ${delta===null?'—':(delta>=0?'+':'')+Math.round(delta)}</td>
+              <td style="font-size:10px;color:var(--text3);max-width:120px;">${prods[0]?.notas||'—'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>`;
+    }).join('')||'<div class="empty">Sin campos configurados</div>'}
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📈 Producción por cuartel — comparativo temporadas</div></div>
+    <div style="height:200px;"><canvas id="compChart"></canvas></div>
+  </div>`;
+
+  setTimeout(()=>{
+    const ctx=el('compChart'); if(!ctx) return;
+    const labels=CUARTELES.map(c=>c.nombre.length>12?c.nombre.slice(0,11)+'…':c.nombre);
+    const cols=['#2d6a2d','#86c986','#c0392b'];
+    CHARTS.comp=new Chart(ctx,{type:'bar',data:{labels,datasets:years.map((yx,i)=>({
+      label:`${yx}/${String(yx+1).slice(-2)}`,
+      data:CUARTELES.map(q=>{const p=PROD_DATA.find(p=>p.cuartel_id===q.id&&p.year===yx);return p?p.kg_ha:null;}),
+      backgroundColor:cols[i],borderRadius:3}))},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},
+        scales:{y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}},
+          x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45}}}}}); }, 100);
+}
+
+async function addProd() {
+  const opts=CUARTELES.map(c=>{const cp=CAMPOS.find(f=>f.id===c.campo_id);return`<option value="${c.id}">${cp?.nombre||'?'} — ${c.nombre}</option>`;}).join('');
+  showModal('Ingresar Producción',`
+    <div style="display:grid;gap:8px;">
+      <div><label>Cuartel</label><select id="pr-c">${opts}</select></div>
+      <div><label>Año temporada (inicio)</label><input id="pr-y" type="number" value="${yr()}"></div>
+      <div><label>kg/ha cosechados (real)</label><input id="pr-k" type="number" placeholder="Ej: 40000"></div>
+      <div><label>Notas</label><input id="pr-n" type="text" placeholder="Real / Proyectado / Estimado..."></div>
+    </div>`,async()=>{
+    const cid=parseInt(el('pr-c').value);
+    const c=CUARTELES.find(x=>x.id===cid);
+    const kgha=parseFloat(el('pr-k').value)||0;
+    const yy=parseInt(el('pr-y').value)||yr();
+    await sb('POST','produccion_prod',{cuartel_id:cid,campo_id:c?.campo_id,year:yy,
+      kg_ha:kgha,kg_totales:kgha*(c?.has||1),notas:el('pr-n').value,usuario_id:myProfile().id});
+    await loadAll(); produccion();
+  });
+}
+
+// ================================================================
+// FENOLOGÍA
+// ================================================================
+async function fenologia() {
+  el('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const y=yr();
+  const [fenCurr,fenPrev]=await Promise.all([
+    sb('GET',`fenologia_prod?year=eq.${y}`),
+    sb('GET',`fenologia_prod?year=eq.${y-1}`),
+  ]);
+  const ESTADOS=[
+    ['f_yema_hinchada','Yema hinchada'],['f_puntas_verdes','Puntas verdes'],
+    ['f_boton_blanco','Botón blanco'],['f_plena_flor','Plena flor'],
+    ['f_cuaja','Cuaja'],['f_cosecha_inicio','Inicio cosecha'],['f_cosecha_fin','Fin cosecha'],
+  ];
+  function diff(d1,d2){if(!d1||!d2)return null;return Math.round((new Date(d1)-new Date(d2))/86400000);}
+
+  el('content').innerHTML=`
+  ${CAMPOS.map(c=>{
+    const cq=CUARTELES.filter(q=>q.campo_id===c.id);
+    return `<div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <div class="card-title">🌸 ${c.nombre} · ${szn()}</div>
+        <button class="tbtn tbtn-primary" onclick="addFenologia(${c.id})">+ Registrar</button>
+      </div>
+      <div style="overflow-x:auto;"><table style="min-width:700px;">
+        <thead><tr><th>Cuartel</th><th>Variedad</th>
+          ${ESTADOS.map(([k,l])=>`<th style="font-size:9px;">${l}<br><span style="color:var(--text3);">Δ vs ${y-1}</span></th>`).join('')}
+          <th>Notas</th></tr></thead>
+        <tbody>${cq.map(q=>{
+          const fen=fenCurr.find(f=>f.cuartel_id===q.id);
+          const fenP=fenPrev.find(f=>f.cuartel_id===q.id);
+          return `<tr>
+            <td style="font-weight:600;">${q.nombre}</td>
+            <td style="font-size:10px;">${q.variedad||'—'}</td>
+            ${ESTADOS.map(([k])=>{
+              const v=fen?fen[k]:null;
+              const vp=fenP?fenP[k]:null;
+              const d=diff(v,vp);
+              return `<td style="font-size:10px;">
+                <div style="color:${v?'var(--green)':'var(--text3)'};">${v?v.slice(5):'—'}</div>
+                ${d!==null?`<div style="font-size:9px;color:${d>0?'var(--red)':d<0?'var(--blue)':'var(--text3)'};">${d>0?'+':''}${d}d</div>`:''}
+              </td>`;
+            }).join('')}
+            <td style="font-size:10px;color:var(--text3);">${fen?.notas||'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }).join('')}`;
+}
+
+function addFenologia(campo_id) {
+  const y=yr();
+  const cq=CUARTELES.filter(q=>q.campo_id===campo_id);
+  const opts=cq.map(c=>`<option value="${c.id}">${c.nombre} (${c.variedad||'—'})</option>`).join('');
+  const ESTADOS=[
+    ['f_yema_hinchada','Yema hinchada'],['f_puntas_verdes','Puntas verdes'],
+    ['f_boton_blanco','Botón blanco'],['f_plena_flor','Plena flor (50%)'],
+    ['f_cuaja','Cuaja'],['f_cosecha_inicio','Inicio cosecha'],['f_cosecha_fin','Fin cosecha'],
+  ];
+  showModal('Registrar Fenología',`
+    <div style="display:grid;gap:8px;">
+      <div><label>Cuartel</label><select id="fn-c">${opts}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        ${ESTADOS.map(([k,l])=>`<div><label style="font-size:10px;">${l}</label><input id="fn-${k}" type="date"></div>`).join('')}
+      </div>
+      <div><label>Estados personalizados (% flor, etc.)</label>
+        <div id="fn-custom-wrap"></div>
+        <button type="button" class="tbtn" style="margin-top:4px;font-size:10px;" onclick="addCustomFenStage()">+ Agregar estado</button>
+      </div>
+      <div><label>Notas</label><input id="fn-notas" type="text"></div>
+    </div>`,async()=>{
+    const cid=parseInt(el('fn-c').value);
+    const v=k=>el(`fn-${k}`)?.value||null;
+    const customStages=[];
+    document.querySelectorAll('.fn-custom-row').forEach(row=>{
+      const lbl=row.querySelector('.fn-cl')?.value;
+      const dt=row.querySelector('.fn-cd')?.value;
+      if(lbl&&dt) customStages.push({label:lbl,fecha:dt});
+    });
+    const payload={cuartel_id:cid,year:y,
+      f_yema_hinchada:v('f_yema_hinchada'),f_puntas_verdes:v('f_puntas_verdes'),
+      f_boton_blanco:v('f_boton_blanco'),f_plena_flor:v('f_plena_flor'),
+      f_cuaja:v('f_cuaja'),f_cosecha_inicio:v('f_cosecha_inicio'),
+      f_cosecha_fin:v('f_cosecha_fin'),
+      estados_custom:JSON.stringify(customStages),
+      notas:el('fn-notas').value,usuario_id:myProfile().id};
+    const existing=FEN_DATA.find(f=>f.cuartel_id===cid&&f.year===y);
+    if(existing) await sb('PATCH',`fenologia_prod?id=eq.${existing.id}`,payload);
+    else await sb('POST','fenologia_prod',payload);
+    await loadAll(); fenologia();
+  });
+}
+
+function addCustomFenStage() {
+  const wrap=el('fn-custom-wrap');
+  if(!wrap) return;
+  const div=document.createElement('div');
+  div.className='fn-custom-row';
+  div.style.cssText='display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:4px;';
+  div.innerHTML=`<input class="fn-cl" type="text" placeholder="Ej: 25% flor" style="padding:5px;border:1px solid var(--border2);border-radius:var(--r);font-size:11px;background:var(--bg);">
+    <input class="fn-cd" type="date" style="padding:5px;border:1px solid var(--border2);border-radius:var(--r);font-size:11px;background:var(--bg);">
+    <button type="button" onclick="this.parentElement.remove()" style="border:1px solid var(--red-bg);background:var(--red-bg);color:var(--red);border-radius:var(--r);padding:0 6px;cursor:pointer;">✕</button>`;
+  wrap.appendChild(div);
+}
+
+// ================================================================
+// LABORES & GANTT
+// ================================================================
+async function labores() {
+  el('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const data = await sb('GET','labores?order=fecha_inicio.asc').catch(()=>[]);
+  LABORES_DATA=data;
+
+  el('content').innerHTML=`
+  <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+    <div style="font-size:11px;color:var(--text2);">${data.length} labores registradas</div>
+    <button class="tbtn tbtn-primary" onclick="addLabor()">+ Nueva labor</button>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><div class="card-title">📋 Labores</div></div>
+    ${data.length?`<div style="overflow-x:auto;"><table style="min-width:900px;">
+      <thead><tr><th>Labor</th><th>Campo</th><th>Cuartel</th><th>Inicio</th><th>Fin</th>
+        <th>Estado</th><th>Tipo</th><th>Contratista</th><th>Producto/Dosis</th><th>Costo</th><th></th></tr></thead>
+      <tbody>${data.map(l=>{
+        const campo=CAMPOS.find(c=>c.id===l.campo_id);
+        const cuartel=CUARTELES.find(c=>c.id===l.cuartel_id);
+        const vencida=l.fecha_fin&&new Date(l.fecha_fin)<new Date()&&!l.terminada;
+        return `<tr style="${vencida?'background:var(--red-bg)':''}">
+          <td style="font-weight:600;">${l.nombre}</td>
+          <td style="font-size:10px;">${campo?.nombre||'—'}</td>
+          <td style="font-size:10px;">${cuartel?.nombre||'Campo general'}</td>
+          <td style="font-size:10px;">${l.fecha_inicio||'—'}</td>
+          <td style="font-size:10px;color:${vencida?'var(--red)':''};">${l.fecha_fin||'En curso'}</td>
+          <td>${l.terminada?'<span class="tbadge tb-green">✅ Lista</span>':vencida?'<span class="tbadge tb-red">⚠️ Vencida</span>':'<span class="tbadge tb-amber">En curso</span>'}</td>
+          <td><span class="tbadge ${l.mano_obra==='contratista'?'tb-blue':'tb-green'}">${l.mano_obra||'—'}</span></td>
+          <td style="font-size:10px;">${l.contratista||'—'}</td>
+          <td style="font-size:10px;">${l.producto?l.producto+(l.dosis?' '+l.dosis+' '+(l.unidad_dosis||''):''):'—'}</td>
+          <td style="font-weight:700;color:var(--green);">${l.costo_total?'$'+Math.round(l.costo_total).toLocaleString():'—'}</td>
+          <td style="display:flex;gap:3px;">
+            ${!l.terminada?`<button class="tbtn" style="font-size:10px;padding:0 5px;" onclick="terminarLabor(${l.id})">✅</button>`:''}
+            <button class="tbtn" style="font-size:10px;padding:0 5px;" onclick="editLabor(${l.id})">✏️</button>
+            <button class="tbtn" style="font-size:10px;padding:0 5px;color:var(--red);" onclick="eliminarLabor(${l.id})">🗑️</button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`:'<div class="empty">Sin labores registradas</div>'}
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 Carta Gantt</div></div>
+    ${data.length?buildGantt(data):'<div class="empty">Sin labores para mostrar</div>'}
+  </div>`;
+}
+
+function buildGantt(data) {
+  const withDates = data.filter(l=>l.fecha_inicio);
+  if (!withDates.length) return '<div class="empty">Sin fechas en las labores</div>';
+  const allStarts=withDates.map(l=>new Date(l.fecha_inicio));
+  const allEnds=withDates.map(l=>l.fecha_fin?new Date(l.fecha_fin):new Date(new Date(l.fecha_inicio).getTime()+7*86400000));
+  const minD=new Date(Math.min(...allStarts));
+  const maxD=new Date(Math.max(...allEnds));
+  const totalDays=Math.ceil((maxD-minD)/86400000)+7;
+  const px=16,barH=22,labelW=140;
+  const W=Math.max(600,totalDays*px+labelW+20);
+  const H=withDates.length*(barH+4)+40;
+  const cols=['#2d6a2d','#2471a3','#8a6200','#c0392b','#7c3aed','#0891b2'];
+
+  const bars=withDates.map((l,i)=>{
+    const s=Math.ceil((new Date(l.fecha_inicio)-minD)/86400000);
+    const endD=l.fecha_fin?new Date(l.fecha_fin):new Date(new Date(l.fecha_inicio).getTime()+7*86400000);
+    const dur=Math.max(1,Math.ceil((endD-new Date(l.fecha_inicio))/86400000));
+    const x=labelW+s*px; const w=Math.max(3,dur*px);
+    const y2=i*(barH+4)+20;
+    const col=l.terminada?'#2d6a2d':cols[i%cols.length];
+    const campo=CAMPOS.find(c=>c.id===l.campo_id);
+    const lbl=`${l.nombre}${campo?' ('+campo.nombre+')':''}`;
+    return `<g>
+      <text x="${labelW-4}" y="${y2+14}" text-anchor="end" font-size="9" fill="#4a5e4a">${lbl.length>20?lbl.slice(0,19)+'…':lbl}</text>
+      <rect x="${x}" y="${y2}" width="${w}" height="${barH}" fill="${col}" opacity="${l.terminada?1:.75}" rx="3"/>
+      <text x="${x+3}" y="${y2+13}" font-size="8" fill="white">${l.fecha_inicio.slice(5)}${l.fecha_fin?' → '+l.fecha_fin.slice(5):''}</text>
+    </g>`;
+  }).join('');
+
+  return `<div style="overflow-x:auto;background:white;border-radius:var(--r);padding:8px;">
+    <svg width="${W}" height="${H}" style="font-family:Segoe UI,sans-serif;">
+      <line x1="${labelW}" y1="0" x2="${labelW}" y2="${H}" stroke="#dde3dd" stroke-width="1"/>
+      ${bars}
+    </svg></div>`;
+}
+
+async function addLabor() {
+  const campoOpts=CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  const cuartelOpts='<option value="">Campo general</option>'+CUARTELES.map(c=>{
+    const cp=CAMPOS.find(f=>f.id===c.campo_id);
+    return`<option value="${c.id}">${cp?.nombre||'?'} — ${c.nombre}</option>`;
+  }).join('');
+  showModal('Nueva Labor',`
+    <div style="display:grid;gap:8px;">
+      <div><label>Nombre de la labor</label><input id="lb-n" type="text" placeholder="Poda, Raleo, Aplicación..."></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Campo</label><select id="lb-cp">${campoOpts}</select></div>
+        <div><label>Cuartel (opcional)</label><select id="lb-cq">${cuartelOpts}</select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Fecha inicio</label><input id="lb-fi" type="date"></div>
+        <div><label>Fecha fin estimada</label><input id="lb-ff" type="date"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Mano de obra</label>
+          <select id="lb-mo"><option value="contratista">Contratista</option><option value="campo">Mano de obra campo</option></select></div>
+        <div><label>Contratista / Empresa</label><input id="lb-cont" type="text"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label>Costo $/ha</label><input id="lb-cha" type="number"></div>
+        <div><label>Costo $/planta</label><input id="lb-cpl" type="number"></div>
+        <div><label>Costo total $</label><input id="lb-ct" type="number"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label>Producto</label><input id="lb-prod" type="text"></div>
+        <div><label>Dosis</label><input id="lb-dosis" type="text" placeholder="2.5"></div>
+        <div><label>Unidad</label><input id="lb-ud" type="text" placeholder="L/ha, g/hl..."></div>
+      </div>
+      <div><label>Notas</label><input id="lb-notas" type="text"></div>
+    </div>`,async()=>{
+    const cid=parseInt(el('lb-cp').value)||null;
+    const qid=parseInt(el('lb-cq').value)||null;
+    const campo=CAMPOS.find(c=>c.id===cid);
+    const cuartel=CUARTELES.find(c=>c.id===qid);
+    // Auto-calc costo total si no fue ingresado
+    let ct=parseFloat(el('lb-ct').value)||null;
+    if(!ct){
+      const cha=parseFloat(el('lb-cha').value)||0;
+      const cpl=parseFloat(el('lb-cpl').value)||0;
+      if(cha&&campo){
+        const hasTotal=CUARTELES.filter(c=>c.campo_id===cid).reduce((s,c)=>s+(c.has||0),0);
+        ct=cha*(cuartel?cuartel.has:hasTotal);
+      } else if(cpl&&cuartel){
+        ct=cpl*(cuartel.n_plantas||1250);
+      }
+    }
+    await sb('POST','labores',{
+      campo_id:cid,cuartel_id:qid,
+      nombre:el('lb-n').value,mano_obra:el('lb-mo').value,contratista:el('lb-cont').value||null,
+      fecha_inicio:el('lb-fi').value||null,fecha_fin:el('lb-ff').value||null,
+      costo_ha:parseFloat(el('lb-cha').value)||null,costo_pl:parseFloat(el('lb-cpl').value)||null,
+      costo_total:ct,producto:el('lb-prod').value||null,
+      dosis:el('lb-dosis').value||null,unidad_dosis:el('lb-ud').value||null,
+      notas:el('lb-notas').value||null,usuario_id:myProfile().id,
+    });
+    await labores();
+  });
+}
+
+async function terminarLabor(id) {
+  await sb('PATCH',`labores?id=eq.${id}`,{terminada:true,fecha_fin:new Date().toISOString().slice(0,10)});
+  await labores();
+}
+
+async function editLabor(id) {
+  const l=LABORES_DATA.find(x=>x.id===id)||{};
+  showModal(`✏️ ${l.nombre||'Labor'}`,`
+    <div style="display:grid;gap:8px;">
+      <div><label>Nombre</label><input id="elb-n" type="text" value="${l.nombre||''}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Fecha inicio</label><input id="elb-fi" type="date" value="${l.fecha_inicio||''}"></div>
+        <div><label>Fecha fin</label><input id="elb-ff" type="date" value="${l.fecha_fin||''}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Costo total $</label><input id="elb-ct" type="number" value="${l.costo_total||''}"></div>
+        <div><label>Estado</label>
+          <select id="elb-t"><option value="false" ${!l.terminada?'selected':''}>En curso</option>
+            <option value="true" ${l.terminada?'selected':''}>Terminada</option></select></div>
+      </div>
+      <div><label>Notas</label><input id="elb-notas" type="text" value="${l.notas||''}"></div>
+    </div>`,async()=>{
+    await sb('PATCH',`labores?id=eq.${id}`,{
+      nombre:el('elb-n').value,fecha_inicio:el('elb-fi').value||null,
+      fecha_fin:el('elb-ff').value||null,
+      costo_total:parseFloat(el('elb-ct').value)||null,
+      terminada:el('elb-t').value==='true',
+      notas:el('elb-notas').value||null});
+    await labores();
+  });
+}
+
+async function eliminarLabor(id) {
+  const l = LABORES_DATA.find(x=>x.id===id);
+  if (!confirm(`¿Eliminar la labor "${l?.nombre||''}"? Esta acción no se puede deshacer.`)) return;
+  await sb('DELETE', `labores?id=eq.${id}`);
+  await labores();
+}
+
+// ================================================================
+// COSTOS
+// ================================================================
+async function costos() {
+  el('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const lb=await sb('GET','labores?order=fecha_inicio.asc').catch(()=>[]);
+
+  // Group by month
+  const byMonth={};
+  lb.filter(l=>l.costo_total&&l.fecha_inicio).forEach(l=>{
+    const m=l.fecha_inicio.slice(0,7);
+    if(!byMonth[m]){byMonth[m]={items:[],total:0};}
+    byMonth[m].items.push(l); byMonth[m].total+=l.costo_total;
+  });
+
+  // Poda costs from poda_prod
+  const podaCostos=PODA_DATA.filter(p=>p.costo_poda_pl||p.costo_amontonado_pl);
+  let totalPodaCal=0;
+  podaCostos.forEach(p=>{
+    const q=CUARTELES.find(c=>c.id===p.cuartel_id);
+    if(q){totalPodaCal+=((p.costo_poda_pl||0)+(p.costo_amontonado_pl||0))*(q.n_plantas||1250);}
+  });
+
+  const totalLab=lb.reduce((s,l)=>s+(l.costo_total||0),0);
+
+  el('content').innerHTML=`
+  <div class="g3" style="margin-bottom:14px;">
+    <div class="metric m-amber">
+      <div class="metric-label">💰 Total labores</div>
+      <div class="metric-val">$${Math.round(totalLab).toLocaleString()}</div>
+      <div class="metric-sub">${lb.filter(l=>l.costo_total).length} labores con costo</div>
+    </div>
+    <div class="metric m-green">
+      <div class="metric-label">✂️ Costo poda (de poda_prod)</div>
+      <div class="metric-val">$${Math.round(totalPodaCal).toLocaleString()}</div>
+      <div class="metric-sub">${podaCostos.length} cuarteles con costo/planta</div>
+    </div>
+    <div class="metric" style="border-color:var(--green);">
+      <div class="metric-label">📊 Total general</div>
+      <div class="metric-val">$${Math.round(totalLab+totalPodaCal).toLocaleString()}</div>
+    </div>
+  </div>
+  <div class="g2" style="margin-bottom:14px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">📅 Costos por mes (labores)</div></div>
+      ${Object.entries(byMonth).sort().map(([m,d])=>`
+        <div class="stat-row">
+          <div style="font-size:11px;font-weight:600;flex:1;">${m}</div>
+          <div style="font-size:10px;color:var(--text2);">${d.items.length} labor(es)</div>
+          <div style="font-weight:700;color:var(--amber);">$${Math.round(d.total).toLocaleString()}</div>
+        </div>`).join('')||'<div class="empty">Sin costos registrados</div>'}
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">✂️ Costos poda por cuartel</div></div>
+      ${podaCostos.length?podaCostos.map(p=>{
+        const q=CUARTELES.find(c=>c.id===p.cuartel_id);
+        const campo=CAMPOS.find(c=>c.id===q?.campo_id);
+        const total=((p.costo_poda_pl||0)+(p.costo_amontonado_pl||0))*(q?.n_plantas||1250);
+        return `<div class="stat-row">
+          <div style="flex:1;"><div style="font-size:11px;font-weight:600;">${q?.nombre||'—'}</div>
+            <div style="font-size:10px;color:var(--text3);">${campo?.nombre||'—'} · ${q?.n_plantas||1250} plantas · T.${p.year}</div></div>
+          <div style="text-align:right;">
+            <div style="font-size:12px;font-weight:700;color:var(--green);">$${Math.round(total).toLocaleString()}</div>
+            <div style="font-size:9px;color:var(--text3);">Poda $${p.costo_poda_pl||0}/pl + Amont. $${p.costo_amontonado_pl||0}/pl</div>
+          </div>
+        </div>`;
+      }).join(''):'<div class="empty">Sin costos de poda ingresados</div>'}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Detalle labores con costo</div></div>
+    <table><thead><tr><th>Labor</th><th>Campo</th><th>Período</th><th>Tipo</th><th>Producto</th><th>Costo</th></tr></thead>
+    <tbody>${lb.filter(l=>l.costo_total).map(l=>{
+      const c=CAMPOS.find(x=>x.id===l.campo_id);
+      return `<tr><td style="font-weight:500;">${l.nombre}</td>
+        <td style="font-size:10px;">${c?.nombre||'—'}</td>
+        <td style="font-size:10px;">${l.fecha_inicio||'—'}${l.fecha_fin?' → '+l.fecha_fin:''}</td>
+        <td><span class="tbadge ${l.mano_obra==='contratista'?'tb-blue':'tb-green'}">${l.contratista||l.mano_obra||'—'}</span></td>
+        <td style="font-size:10px;">${l.producto?l.producto+(l.dosis?' '+l.dosis+' '+(l.unidad_dosis||''):''):'—'}</td>
+        <td style="font-weight:700;color:var(--amber);">$${Math.round(l.costo_total).toLocaleString()}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="6" class="empty">Sin labores con costo</td></tr>'}</tbody>
+    </table>
+  </div>`;
+}
+
+// ================================================================
+// ESTACIONES
+// ================================================================
+function estaciones() {
+  const rdgs=getAllReadings();
+  const allSt=[...rdgs,...CAMPOS.filter(c=>!rdgs.some(r=>r.station_name===c.nombre))
+    .map(c=>({station_name:c.nombre,source:c.estacion_tipo==='davis'?'Davis WeatherLink':'Agroclima',
+      temp_c:null,humidity_pct:null,wind_speed_kmh:null,rain_mm:null}))];
+
+  el('content').innerHTML=`
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+    <button class="tbtn tbtn-primary" onclick="addEstacion()">+ Conectar estación</button>
+  </div>
+  <div class="g2">
+    ${allSt.map(r=>`
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-header">
+          <div class="card-title"><span class="dot ${r.temp_c!==null?'dot-green':'dot-red'}"></span>${r.station_name||r.source}</div>
+          <span class="tbadge ${r.source==='Davis WeatherLink'?'tb-blue':'tb-green'}">${r.source}</span>
+        </div>
+        ${r.temp_c!==null?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          ${[['🌡️','Temperatura',fmt(r.temp_c,1,'°C')],['💧','Humedad',fmt(r.humidity_pct,1,'%')],
+             ['💨','Viento',fmt(r.wind_speed_kmh,1,' km/h')],['🌧️','Lluvia',fmt(r.rain_mm,1,' mm')],
+             ['💦','Pto. Rocío',fmt(r.dew_point_c,1,'°C')],['☀️','Rad. Solar',fmt(r.solar_rad_wm2,0,' W/m²')],
+             ['🔵','Presión',fmt(r.pressure_hpa,1,' hPa')],['🌿','ET día',fmt(r.et_day_mm,2,' mm')]
+            ].map(([i,l,v])=>`<div style="background:var(--bg);border-radius:var(--r);padding:8px;">
+              <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${i} ${l}</div>
+              <div style="font-size:14px;font-weight:700;">${v}</div></div>`).join('')}</div>`
+        :`<div class="empty">Sin señal — scheduler no ha enviado datos de esta estación</div>`}
+        <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right;">${WEATHER?.updated_at_human||'—'}</div>
+      </div>`).join('')||'<div class="card"><div class="empty">Sin estaciones — ejecuta el scheduler</div></div>'}
+  </div>`;
+}
+
+function addEstacion() {
+  const campoOpts=CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  showModal('Conectar nueva estación',`
+    <div style="display:grid;gap:10px;">
+      <div><label>Tipo</label>
+        <select id="ne-t" onchange="el('ne-d').style.display=this.value==='davis'?'':'none';el('ne-a').style.display=this.value!=='davis'?'':'none';">
+          <option value="davis">Davis WeatherLink</option>
+          <option value="agroclima">Agroclima</option>
+        </select></div>
+      <div id="ne-d">
+        <div style="margin-bottom:6px;"><label>Station ID</label><input id="ne-sid" type="number" placeholder="212506"></div>
+        <div style="margin-bottom:6px;"><label>API Key</label><input id="ne-key" type="text"></div>
+        <div><label>API Secret</label><input id="ne-sec" type="text"></div>
+      </div>
+      <div id="ne-a" style="display:none;"><label>Código Agroclima</label>
+        <input id="ne-cod" type="text" placeholder="340070">
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">agroclima.cl/InfoEstacion?codigo=XXXXXX</div></div>
+      <div><label>Asignar al campo</label><select id="ne-campo">${campoOpts}</select></div>
+    </div>`,async()=>{
+    const tipo=el('ne-t').value;
+    const cid=parseInt(el('ne-campo').value);
+    await sb('PATCH',`campos_prod?id=eq.${cid}`,{
+      estacion_tipo:tipo,
+      davis_station_id:tipo==='davis'?parseInt(el('ne-sid').value)||null:null,
+      davis_api_key:tipo==='davis'?el('ne-key').value:null,
+      davis_api_secret:tipo==='davis'?el('ne-sec').value:null,
+      agroclima_codigo:tipo!=='davis'?el('ne-cod').value:null,
+    });
+    alert('✅ Guardado. El scheduler usará esta estación en la próxima ejecución.');
+    await loadAll(); estaciones();
+  });
+}
+
+// ================================================================
+// CAMPOS CONFIG
+// ================================================================
+async function campos_config() {
+  el('content').innerHTML=`
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+    <button class="tbtn tbtn-primary" onclick="addCampo()">+ Nuevo campo</button>
+  </div>
+  ${CAMPOS.map(c=>{
+    const cq=CUARTELES.filter(q=>q.campo_id===c.id);
+    const totalHas=cq.reduce((s,q)=>s+(q.has||0),0);
+    const frioTot=FRIO_CAMPOS.filter(f=>f.campo_id===c.id).reduce((s,f)=>s+(f.horas_frio||0),0);
+    const gdLast=GD_CAMPOS.filter(g=>g.campo_id===c.id).slice(-1)[0];
+    return `<div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <div class="card-title">🗺️ ${c.nombre}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="tbtn" onclick="editCampo(${c.id})">⚙️ Estación</button>
+          <button class="tbtn tbtn-primary" onclick="addCuartel(${c.id},'${c.nombre}')">+ Cuartel</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:var(--bg);padding:8px;border-radius:var(--r);text-align:center;">
+          <div style="font-size:10px;color:var(--text2);">📡 Estación</div>
+          <div style="font-weight:600;font-size:11px;">${c.estacion_tipo==='davis'?'Davis '+c.davis_station_id:'Agroclima '+c.agroclima_codigo}</div>
+        </div>
+        <div style="background:var(--bg);padding:8px;border-radius:var(--r);text-align:center;">
+          <div style="font-size:10px;color:var(--text2);">🌿 Superficie</div>
+          <div style="font-weight:700;color:var(--green);">${totalHas.toFixed(1)} há · ${cq.length} cuarteles</div>
+        </div>
+        <div style="background:var(--frost-bg);padding:8px;border-radius:var(--r);text-align:center;">
+          <div style="font-size:10px;color:var(--text2);">❄️ Frío HF</div>
+          <div style="font-weight:700;color:var(--frost);">${frioTot>0?frioTot.toFixed(0):'—'}</div>
+        </div>
+        <div style="background:var(--purple-bg);padding:8px;border-radius:var(--r);text-align:center;">
+          <div style="font-size:10px;color:var(--text2);">🌡️ GD acum.</div>
+          <div style="font-weight:700;color:var(--purple);">${gdLast?fmt(gdLast.gd_acum,0):'—'}</div>
+        </div>
+      </div>
+      <table><thead><tr><th>Cuartel</th><th>Variedad</th><th>Sistema</th><th>Há</th><th>Plantas/ha</th><th>DEH</th><th>DSH</th><th></th></tr></thead>
+      <tbody>${cq.map(q=>`<tr>
+        <td style="font-weight:500;">${q.nombre}</td>
+        <td>${q.variedad||'—'}</td><td>${q.sistema||'—'}</td>
+        <td>${q.has||'—'}</td><td>${q.n_plantas||1250}</td>
+        <td style="font-size:10px;">${q.deh||'—'}</td>
+        <td style="font-size:10px;">${q.dsh||'—'}</td>
+        <td><button class="tbtn" style="font-size:10px;padding:0 5px;" onclick="editCuartel(${q.id})">✏️</button></td>
+      </tr>`).join('')}</tbody></table>
+    </div>`;
+  }).join('')}`;
+}
+
+async function editCampo(campo_id) {
+  const c=CAMPOS.find(x=>x.id===campo_id)||{};
+  showModal(`⚙️ Estación — ${c.nombre}`,`
+    <div style="display:grid;gap:8px;">
+      <div><label>Tipo</label>
+        <select id="ec-t" onchange="el('ec-d').style.display=this.value==='davis'?'':'none';el('ec-a').style.display=this.value!=='davis'?'':'none';">
+          <option value="davis" ${c.estacion_tipo==='davis'?'selected':''}>Davis WeatherLink</option>
+          <option value="agroclima" ${c.estacion_tipo!=='davis'?'selected':''}>Agroclima</option>
+        </select></div>
+      <div id="ec-d" style="display:${c.estacion_tipo==='davis'?'':'none'};display:grid;gap:6px;">
+        <div><label>Station ID</label><input id="ec-sid" type="number" value="${c.davis_station_id||''}"></div>
+        <div><label>API Key</label><input id="ec-key" type="text" value="${c.davis_api_key||''}"></div>
+        <div><label>API Secret</label><input id="ec-sec" type="text" value="${c.davis_api_secret||''}"></div>
+      </div>
+      <div id="ec-a" style="display:${c.estacion_tipo!=='davis'?'':'none'};">
+        <label>Código Agroclima</label><input id="ec-cod" type="text" value="${c.agroclima_codigo||''}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Base GD (°C)</label><input id="ec-base" type="number" step="0.1" value="${c.base_grados_dia||10.2}"></div>
+        <div><label>Inicio frío (MM-DD)</label><input id="ec-if" type="text" value="${c.inicio_frio||'05-15'}"></div>
+        <div><label>Fin frío (MM-DD)</label><input id="ec-ff" type="text" value="${c.fin_frio||'07-31'}"></div>
+        <div><label>Inicio GD (MM-DD)</label><input id="ec-ig" type="text" value="${c.inicio_gd||'08-15'}"></div>
+      </div>
+    </div>`,async()=>{
+    const tipo=el('ec-t').value;
+    await sb('PATCH',`campos_prod?id=eq.${campo_id}`,{
+      estacion_tipo:tipo,
+      davis_station_id:tipo==='davis'?parseInt(el('ec-sid').value)||null:null,
+      davis_api_key:tipo==='davis'?el('ec-key').value||null:null,
+      davis_api_secret:tipo==='davis'?el('ec-sec').value||null:null,
+      agroclima_codigo:tipo!=='davis'?el('ec-cod').value||null:null,
+      base_grados_dia:parseFloat(el('ec-base').value)||10.2,
+      inicio_frio:el('ec-if').value,fin_frio:el('ec-ff').value,inicio_gd:el('ec-ig').value,
+    });
+    alert('✅ Guardado. El scheduler usará esta configuración en la próxima ejecución.');
+    await loadAll(); campos_config();
+  });
+}
+
+async function addCampo() {
+  showModal('Nuevo campo',`
+    <div style="display:grid;gap:8px;">
+      <div><label>Nombre</label><input id="nc-n" type="text"></div>
+      <div><label>Tipo estación</label>
+        <select id="nc-t" onchange="el('nc-d').style.display=this.value==='davis'?'':'none';el('nc-a').style.display=this.value!=='davis'?'':'none';">
+          <option value="agroclima">Agroclima</option><option value="davis">Davis</option></select></div>
+      <div id="nc-a"><label>Código Agroclima</label><input id="nc-ac" type="text" placeholder="340070"></div>
+      <div id="nc-d" style="display:none;">
+        <div><label>Station ID</label><input id="nc-si" type="number"></div>
+        <div><label>API Key</label><input id="nc-k" type="text"></div>
+        <div><label>API Secret</label><input id="nc-s" type="text"></div>
+      </div>
+    </div>`,async()=>{
+    const tipo=el('nc-t').value;
+    await sb('POST','campos_prod',{
+      nombre:el('nc-n').value,estacion_tipo:tipo,
+      davis_station_id:tipo==='davis'?parseInt(el('nc-si').value)||null:null,
+      davis_api_key:tipo==='davis'?el('nc-k').value||null:null,
+      davis_api_secret:tipo==='davis'?el('nc-s').value||null:null,
+      agroclima_codigo:tipo!=='davis'?el('nc-ac').value||null:null,
+      base_grados_dia:10.2,
+    });
+    await loadAll(); campos_config();
+  });
+}
+
+async function editCuartel(cuartel_id) {
+  const q=CUARTELES.find(c=>c.id===cuartel_id)||{};
+  showModal(`✏️ Cuartel — ${q.nombre}`,`
+    <div style="display:grid;gap:8px;">
+      <div><label>Nombre</label><input id="cq-n" type="text" value="${q.nombre||''}"></div>
+      <div><label>Variedad / Frutal</label><input id="cq-v" type="text" value="${q.variedad||''}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label>Hectáreas</label><input id="cq-h" type="number" step="0.01" value="${q.has||''}"></div>
+        <div><label>DEH (m)</label><input id="cq-deh" type="number" step="0.1" value="${q.deh||''}" oninput="calcPl()"></div>
+        <div><label>DSH (m)</label><input id="cq-dsh" type="number" step="0.1" value="${q.dsh||''}" oninput="calcPl()"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Plantas/ha</label><input id="cq-pl" type="number" value="${q.n_plantas||1250}">
+          <div style="font-size:10px;color:var(--text3);">Se calcula solo con DEH y DSH</div></div>
+        <div><label>Sistema</label><select id="cq-s">
+          ${['Espaldera','Parrón','KGB','UFO','Techo'].map(s=>`<option ${q.sistema===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      </div>
+    </div>`,async()=>{
+    const deh=parseFloat(el('cq-deh').value)||null;
+    const dsh=parseFloat(el('cq-dsh').value)||null;
+    const nPl=deh&&dsh?Math.round(10000/(deh*dsh)):(parseInt(el('cq-pl').value)||1250);
+    await sb('PATCH',`cuarteles_prod?id=eq.${cuartel_id}`,{
+      nombre:el('cq-n').value,variedad:el('cq-v').value,
+      has:parseFloat(el('cq-h').value)||null,deh,dsh,n_plantas:nPl,sistema:el('cq-s').value});
+    await loadAll(); campos_config();
+  });
+}
+function calcPl(){
+  const deh=parseFloat(el('cq-deh')?.value)||0;
+  const dsh=parseFloat(el('cq-dsh')?.value)||0;
+  if(deh&&dsh&&el('cq-pl')) el('cq-pl').value=Math.round(10000/(deh*dsh));
+}
+
+async function addCuartel(campo_id,campo_nombre){
+  showModal(`Nuevo cuartel — ${campo_nombre}`,`
+    <div style="display:grid;gap:8px;">
+      <div><label>Nombre</label><input id="nq-n" type="text"></div>
+      <div><label>Variedad</label><input id="nq-v" type="text"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label>Hectáreas</label><input id="nq-h" type="number" step="0.01"></div>
+        <div><label>DEH (m)</label><input id="nq-deh" type="number" step="0.1"></div>
+        <div><label>DSH (m)</label><input id="nq-dsh" type="number" step="0.1"></div>
+      </div>
+      <div><label>Sistema</label><select id="nq-s">
+        <option>Espaldera</option><option>Parrón</option><option>KGB</option><option>UFO</option><option>Techo</option></select></div>
+    </div>`,async()=>{
+    const deh=parseFloat(el('nq-deh').value)||null;
+    const dsh=parseFloat(el('nq-dsh').value)||null;
+    const nPl=deh&&dsh?Math.round(10000/(deh*dsh)):1250;
+    await sb('POST','cuarteles_prod',{campo_id,nombre:el('nq-n').value,
+      variedad:el('nq-v').value,has:parseFloat(el('nq-h').value)||null,
+      deh,dsh,n_plantas:nPl,sistema:el('nq-s').value});
+    await loadAll(); campos_config();
+  });
+}
+
+// ================================================================
+// ALERTAS
+// ================================================================
+async function alertas() {
+  const p=myProfile();
+  const thr=p.thresholds||{frost_leve:-2,frost_moderada:-4,frost_severa:-6,rain_alert_mm:15};
+  const frioAlerts=await sb('GET',`frio_alerts?usuario_id=eq.${p.id||0}&order=created_at.desc`).catch(()=>[]);
+
+  el('content').innerHTML=`
+  <div class="g2" style="margin-bottom:14px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">🧊 Umbrales de helada</div></div>
+      ${[['Leve','var(--amber)','frost_leve',thr.frost_leve],
+         ['Moderada','var(--red)','frost_moderada',thr.frost_moderada],
+         ['Severa','var(--red)','frost_severa',thr.frost_severa]].map(([n,c,k,v])=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:600;color:${c};">● Helada ${n}</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" id="thr-${k}" value="${v}" step="0.5" style="width:60px;text-align:center;font-weight:700;">
+            <span style="font-size:11px;">°C</span>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🌧️ Umbral lluvia</div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);">
+        <span style="font-size:11px;font-weight:600;">🌧️ Alerta lluvia</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="number" id="thr-rain_alert_mm" value="${thr.rain_alert_mm}" step="1" style="width:60px;text-align:center;font-weight:700;">
+          <span style="font-size:11px;">mm</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <button class="tbtn tbtn-primary" onclick="saveThresholds()">💾 Guardar umbrales</button>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header">
+      <div class="card-title">❄️ Alertas por acumulación de frío</div>
+      <button class="tbtn tbtn-primary" onclick="addFrioAlert()">+ Agregar</button>
+    </div>
+    ${frioAlerts.length?frioAlerts.map(a=>{
+      const campo=CAMPOS.find(c=>c.id===a.campo_id);
+      return `<div class="stat-row">
+        <span style="font-size:16px;">❄️</span>
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:600;">${campo?.nombre||'?'} — cuando llegue a ${a.umbral} unidades (${a.modelo})</div>
+          <div style="font-size:10px;color:var(--text3);">${a.mensaje||'Sin mensaje'}</div>
+        </div>
+        <span class="tbadge ${a.disparada?'tb-red':a.activa?'tb-green':'tb-amber'}">${a.disparada?'🔔 Disparada':a.activa?'Activa':'Inactiva'}</span>
+        <button class="tbtn" style="font-size:10px;" onclick="eliminarAlerta(${a.id})">🗑️</button>
+      </div>`;
+    }).join(''):'<div class="empty">Sin alertas de frío configuradas</div>'}
+  </div>`;
+}
+
+async function saveThresholds(){
+  const uid=myProfile().id; if(!uid) return;
+  const thresholds={
+    frost_leve:parseFloat(el('thr-frost_leve').value),
+    frost_moderada:parseFloat(el('thr-frost_moderada').value),
+    frost_severa:parseFloat(el('thr-frost_severa').value),
+    rain_alert_mm:parseFloat(el('thr-rain_alert_mm').value),
+  };
+  await sb('PATCH',`usuarios?id=eq.${uid}`,{thresholds});
+  if(SESSION.profile) SESSION.profile.thresholds=thresholds;
+  alert('✅ Umbrales guardados');
+}
+
+function addFrioAlert(){
+  const campoOpts=CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  showModal('Alerta de frío acumulado',`
+    <div style="display:grid;gap:8px;">
+      <div><label>Campo</label><select id="fa-campo">${campoOpts}</select></div>
+      <div><label>Modelo</label>
+        <select id="fa-modelo">
+          <option value="horas">Horas Frío</option>
+          <option value="richardson">Richardson Modificado</option>
+          <option value="utah">Dynamic Model Utah</option>
+        </select></div>
+      <div><label>Umbral de acumulación</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="fa-val" type="number" placeholder="Ej: 500">
+          <span style="font-size:11px;color:var(--text2);white-space:nowrap;">unidades</span>
+        </div></div>
+      <div><label>Mensaje de alerta</label>
+        <input id="fa-msg" type="text" placeholder="Ej: Alcanzado umbral para inicio de aclareo..."></div>
+    </div>`,async()=>{
+    await sb('POST','frio_alerts',{
+      usuario_id:myProfile().id,
+      campo_id:parseInt(el('fa-campo').value),
+      modelo:el('fa-modelo').value,
+      umbral:parseFloat(el('fa-val').value)||0,
+      mensaje:el('fa-msg').value,
+    });
+    alertas();
+  });
+}
+
+async function eliminarAlerta(id){
+  if(!confirm('¿Eliminar esta alerta?')) return;
+  await sb('DELETE',`frio_alerts?id=eq.${id}`,'',''  );
+  alertas();
+}
+
+// ================================================================
+// EXPORTAR
+// ================================================================
+async function exportar(){
+  el('content').innerHTML=`
+  <div class="card">
+    <div class="card-header"><div class="card-title">📤 Exportar datos (CSV)</div></div>
+    <div style="display:grid;gap:8px;">
+      ${[
+        ['🌿','Poda & Vigor','Dardos, frutos, vigor, costos por cuartel y temporada','poda'],
+        ['📦','Producción','kg/ha histórico por cuartel y campo','produccion'],
+        ['❄️','Frío por campo','Acumulado por quincena por campo y modelo','frio'],
+        ['🌸','Fenología','Estados por cuartel y temporada','fenologia'],
+        ['📋','Labores','Todas las labores con costos','labores'],
+      ].map(([icon,title,desc,key])=>`
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:var(--r2);background:var(--bg);">
+          <span style="font-size:24px;">${icon}</span>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:700;">${title}</div>
+            <div style="font-size:10px;color:var(--text3);">${desc}</div>
+          </div>
+          <button class="tbtn tbtn-primary" onclick="exportCSV('${key}')">⬇️ Descargar CSV</button>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function exportCSV(seccion){
+  let headers=[], rows=[];
+  const y=yr();
+  if(seccion==='poda'){
+    headers=['Campo','Cuartel','Variedad','Há','Plantas_ha','Año','Dardos_Pl','Frutos_Dardo','Intensidad_%','Vigor','Costo_Poda_Pl','Costo_Amont_Pl','Notas'];
+    CAMPOS.forEach(c=>CUARTELES.filter(q=>q.campo_id===c.id).forEach(q=>{
+      PODA_DATA.filter(p=>p.cuartel_id===q.id).forEach(p=>{
+        rows.push([c.nombre,q.nombre,q.variedad,q.has,q.n_plantas||1250,p.year,
+          p.conteo_dardos,p.flores_dardo,p.intensidad_pct,p.vigor,p.costo_poda_pl,p.costo_amontonado_pl,p.observaciones]);
+      });
+    }));
+  } else if(seccion==='produccion'){
+    headers=['Campo','Cuartel','Variedad','Há','Año','Kg_Ha','Kg_Totales','Notas'];
+    CAMPOS.forEach(c=>CUARTELES.filter(q=>q.campo_id===c.id).forEach(q=>{
+      PROD_DATA.filter(p=>p.cuartel_id===q.id).forEach(p=>{
+        rows.push([c.nombre,q.nombre,q.variedad,q.has,p.year,p.kg_ha,p.kg_totales,p.notas]);
+      });
+    }));
+  } else if(seccion==='frio'){
+    headers=['Campo','Año','Quincena','Horas_Frio','Richardson','Dynamic_Model_Utah'];
+    FRIO_CAMPOS.forEach(f=>{
+      const c=CAMPOS.find(x=>x.id===f.campo_id);
+      rows.push([c?.nombre,f.year,f.quincena,f.horas_frio,f.richardson,f.dynamic_model]);
+    });
+  } else if(seccion==='fenologia'){
+    headers=['Campo','Cuartel','Variedad','Año','Yema_Hinchada','Puntas_Verdes','Boton_Blanco','Plena_Flor','Cuaja','Cosecha_Inicio','Cosecha_Fin','Notas'];
+    FEN_DATA.forEach(f=>{
+      const q=CUARTELES.find(x=>x.id===f.cuartel_id);
+      const c=CAMPOS.find(x=>x.id===q?.campo_id);
+      rows.push([c?.nombre,q?.nombre,q?.variedad,f.year,f.f_yema_hinchada,f.f_puntas_verdes,
+        f.f_boton_blanco,f.f_plena_flor,f.f_cuaja,f.f_cosecha_inicio,f.f_cosecha_fin,f.notas]);
+    });
+  } else if(seccion==='labores'){
+    const lb=await sb('GET','labores?order=fecha_inicio.asc').catch(()=>[]);
+    headers=['Campo','Cuartel','Labor','Mano_Obra','Contratista','Fecha_Inicio','Fecha_Fin','Terminada','Producto','Dosis','Unidad','Costo_Total','Notas'];
+    lb.forEach(l=>{
+      const c=CAMPOS.find(x=>x.id===l.campo_id);
+      const q=CUARTELES.find(x=>x.id===l.cuartel_id);
+      rows.push([c?.nombre,q?.nombre,l.nombre,l.mano_obra,l.contratista,l.fecha_inicio,l.fecha_fin,
+        l.terminada?'SI':'NO',l.producto,l.dosis,l.unidad_dosis,l.costo_total,l.notas]);
+    });
+  }
+  if(!rows.length){alert('Sin datos para exportar');return;}
+  const v=v=>(v===null||v===undefined)?'':String(v).replace(/,/g,';').replace(/\n/g,' ');
+  const csv=[headers,...rows].map(r=>r.map(v).join(',')).join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`agrosuite_${seccion}.csv`;a.click();
+}
+
+// ================================================================
+// MI CONFIG
+// ================================================================
+function mi_config(){
+  const p=myProfile();
+  el('content').innerHTML=`
+  <div class="card" style="max-width:480px;">
+    <div class="card-header"><div class="card-title">⚙️ Mi configuración</div></div>
+    <div style="display:grid;gap:10px;">
+      <div><label>Tipo de estación</label>
+        <select id="cfg-t" onchange="el('cfg-d').style.display=this.value==='davis'?'':'none';el('cfg-a').style.display=this.value!=='davis'?'':'none';">
+          <option value="agroclima" ${p.estacion_tipo!=='davis'?'selected':''}>Agroclima</option>
+          <option value="davis" ${p.estacion_tipo==='davis'?'selected':''}>Davis WeatherLink</option>
+        </select></div>
+      <div id="cfg-a" style="display:${p.estacion_tipo!=='davis'?'':'none'};">
+        <label>Código Agroclima</label><input id="cfg-ac" type="text" value="${p.agroclima_codigo||'340070'}">
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">agroclima.cl/InfoEstacion?codigo=XXXXXX</div></div>
+      <div id="cfg-d" style="display:${p.estacion_tipo==='davis'?'':'none'};">
+        <label>Station ID Davis</label><input id="cfg-di" type="number" value="${p.davis_station_id||''}"></div>
+      <div><label>Modelo de frío</label>
+        <select id="cfg-m">
+          <option value="utah" ${p.modelo_frio==='utah'?'selected':''}>Dynamic Model Utah (Erez & Fishman, 1977)</option>
+          <option value="horas" ${p.modelo_frio==='horas'?'selected':''}>Horas Frío (Weinberger, 1950)</option>
+          <option value="richardson" ${p.modelo_frio==='richardson'?'selected':''}>Richardson Modificado (1974)</option>
+          <option value="richardson_pos" ${p.modelo_frio==='richardson_pos'?'selected':''}>Richardson s/negativos</option>
+        </select></div>
+      <button class="btn-primary" onclick="saveMiConfig()">💾 Guardar</button>
+    </div>
+  </div>`;
+}
+
+async function saveMiConfig(){
+  const uid=myProfile().id; if(!uid) return;
+  const tipo=el('cfg-t').value;
+  const update={estacion_tipo:tipo,modelo_frio:el('cfg-m').value,
+    agroclima_codigo:tipo!=='davis'?el('cfg-ac').value:null,
+    davis_station_id:tipo==='davis'?parseInt(el('cfg-di').value)||null:null};
+  await sb('PATCH',`usuarios?id=eq.${uid}`,update);
+  Object.assign(SESSION.profile,update);
+  alert('✅ Guardado');
+}
+
+// ================================================================
+// USUARIOS
+// ================================================================
+async function usuarios(){
+  el('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const users=await sb('GET','usuarios?active=eq.true&order=nombre');
+  el('content').innerHTML=`
+  <div class="card">
+    <div class="card-header"><div class="card-title">👥 Usuarios</div></div>
+    ${users.map(u=>{
+      const c=CHILL_ROWS.filter(x=>x.usuario_id===u.id).sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at))[0];
+      return `<div class="stat-row">
+        <div class="avatar" style="width:36px;height:36px;font-size:12px;flex-shrink:0;">${u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;">${u.nombre}</div>
+          <div style="font-size:11px;color:var(--text2);">${u.rol} · ${u.email}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px;">
+            📡 ${u.estacion_tipo==='davis'?'Davis '+u.davis_station_id:'Agroclima '+u.agroclima_codigo}
+            · ❄️ ${u.modelo_frio||'—'}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:700;color:var(--frost);">${fmt(c?.acumulado,1)}</div>
+          <div style="font-size:10px;color:var(--text3);">${c?.label||'Sin datos'}</div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ================================================================
+// MODAL
+// ================================================================
+function showModal(title, body, onOk){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML=`<div style="background:var(--card);border-radius:var(--r2);border:1px solid var(--border);padding:20px;width:500px;max-width:100%;max-height:90vh;overflow-y:auto;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px;">${title}</div>
+    ${body}
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="tbtn" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button id="m-ok" class="tbtn tbtn-primary">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  el('m-ok').onclick=()=>{try{onOk();}catch(e){console.error(e);}ov.remove();};
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+}
+
+// ================================================================
+// INIT
+// ================================================================
+async function init(){
+  const saved=localStorage.getItem('sb_session');
+  if(!saved){showLogin();return;}
+  try{
+    SESSION=JSON.parse(saved);
+    // Verify token
+    const test=await fetch(`${SB_URL}/auth/v1/user`,{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.access_token}
+    });
+    if(!test.ok){localStorage.removeItem('sb_session');showLogin();return;}
+    await loadProfile();
+    await loadAll();
+  }catch(e){console.error('init:',e);showLogin();}
+}
+
+init();
+setInterval(()=>{if(SESSION)loadAll();},300000); // auto-refresh every 5min
+</script>
+</body>
+</html>
