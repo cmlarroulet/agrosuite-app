@@ -443,14 +443,25 @@ function dashboard() {
   const y   = yr();
   const rdgs = getAllReadings();
 
-  const stationList = CAMPOS.map(c=>{
+  // Varios campos pueden compartir la misma estación física (ej: ALV, La Tuna
+  // y Macaya leen todas de la Estación Macaya) — se agrupa por estación para
+  // no repetir la misma lectura una vez por cada campo que la usa.
+  const seenStations = new Map();
+  CAMPOS.forEach(c=>{
     const r = readingForCampo(c, rdgs);
-    return r ? {...r, station_name:r.station_name||c.nombre} : {
+    const key = r
+      ? 'r:'+(r.station_id!=null?r.station_id:(r.station_name||c.nombre))
+      : c.estacion_tipo==='davis' && c.davis_station_id ? 'davis:'+c.davis_station_id
+      : c.estacion_tipo!=='davis' && c.agroclima_codigo ? 'agro:'+c.agroclima_codigo
+      : 'campo:'+c.id;
+    if (seenStations.has(key)) return;
+    seenStations.set(key, r ? {...r, station_name:r.station_name||c.nombre} : {
       station_name:c.nombre,
       source:c.estacion_tipo==='davis'?'Davis WeatherLink':'Agroclima',
       temp_c:null, humidity_pct:null, wind_speed_kmh:null, rain_mm:null
-    };
+    });
   });
+  const stationList = Array.from(seenStations.values());
   const matched = new Set(CAMPOS.map(c=>readingForCampo(c, rdgs)).filter(Boolean));
   const extraStations = rdgs.filter(r => !matched.has(r));
   const allStationTiles = [...stationList, ...extraStations];
