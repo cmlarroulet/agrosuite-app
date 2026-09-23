@@ -364,7 +364,7 @@ function showLogin() {
             <select id="rg-r"><option>Agrónomo Jefe</option><option>Técnico Agrícola</option><option>Encargado Campo</option></select></div>
           <div><label>Modelo de frío</label>
             <select id="rg-m">
-              <option value="utah">Dynamic Model Utah (Erez & Fishman, 1977)</option>
+              <option value="utah">Porciones de Frío (Dynamic Model, Fishman &amp; Erez 1990)</option>
               <option value="horas">Horas Frío (Weinberger, 1950)</option>
               <option value="richardson">Richardson Modificado (1974)</option>
             </select></div>
@@ -469,7 +469,7 @@ function dashboard() {
   const FRIO_MODELOS = [
     {value:'horas_frio',   label:'Horas Frío'},
     {value:'richardson',   label:'Richardson Mod.'},
-    {value:'dynamic_model',label:'Dynamic Model Utah'},
+    {value:'dynamic_model',label:'Porciones de Frío (Dynamic Model)'},
   ];
 
   el('content').innerHTML = `
@@ -653,8 +653,10 @@ function clima() {
   const rdgs   = getAllReadings();
   const p      = myProfile();
   const thr    = p.thresholds||{frost_leve:-2,frost_moderada:-4,frost_severa:-6,rain_alert_mm:15};
-  const allSt  = [...rdgs,...CAMPOS.filter(c=>!rdgs.some(r=>r.station_name===c.nombre))
-    .map(c=>({station_name:c.nombre,source:c.estacion_tipo==='davis'?'Davis':'Agroclima',temp_c:null,humidity_pct:null,wind_speed_kmh:null,rain_mm:null}))];
+  // Solo estaciones físicas reales (rdgs) — los campos (ALV, La Tuna, Macaya...)
+  // no son estaciones, son propiedades que LEEN de una estación, así que no
+  // deben listarse aquí como si fueran una.
+  const allSt  = rdgs;
 
   el('content').innerHTML = `
   <div class="card" style="margin-bottom:14px;">
@@ -714,8 +716,7 @@ function renderStationTiles(r) {
 }
 
 function updateClimaStation() {
-  const allSt = [...getAllReadings(),...CAMPOS.filter(c=>!getAllReadings().some(r=>r.station_name===c.nombre))
-    .map(c=>({station_name:c.nombre,source:c.estacion_tipo==='davis'?'Davis':'Agroclima',temp_c:null,humidity_pct:null,wind_speed_kmh:null,rain_mm:null}))];
+  const allSt = getAllReadings();
   const idx = parseInt(el('clima-st-sel')?.value||0);
   const wrap = el('clima-readings');
   if (wrap) wrap.innerHTML = renderStationTiles(allSt[idx]||{});
@@ -749,7 +750,7 @@ function frio() {
         <select class="sel" id="frio-modelo" onchange="updateFrioTable()">
           <option value="horas_frio">Horas Frío (Weinberger, 1950)</option>
           <option value="richardson">Richardson Modificado (1974)</option>
-          <option value="dynamic_model">Dynamic Model Utah (Erez & Fishman, 1977)</option>
+          <option value="dynamic_model">Porciones de Frío (Dynamic Model, Fishman &amp; Erez 1990)</option>
         </select>
       </div>
       <div style="overflow-x:auto;">
@@ -1885,7 +1886,7 @@ function addFrioAlert(){
         <select id="fa-modelo">
           <option value="horas">Horas Frío</option>
           <option value="richardson">Richardson Modificado</option>
-          <option value="utah">Dynamic Model Utah</option>
+          <option value="utah">Porciones de Frío (Dynamic Model)</option>
         </select></div>
       <div><label>Umbral de acumulación</label>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -2010,7 +2011,7 @@ function mi_config(){
         <label>Station ID Davis</label><input id="cfg-di" type="number" value="${p.davis_station_id||''}"></div>
       <div><label>Modelo de frío</label>
         <select id="cfg-m">
-          <option value="utah" ${p.modelo_frio==='utah'?'selected':''}>Dynamic Model Utah (Erez & Fishman, 1977)</option>
+          <option value="utah" ${p.modelo_frio==='utah'?'selected':''}>Porciones de Frío (Dynamic Model, Fishman &amp; Erez 1990)</option>
           <option value="horas" ${p.modelo_frio==='horas'?'selected':''}>Horas Frío (Weinberger, 1950)</option>
           <option value="richardson" ${p.modelo_frio==='richardson'?'selected':''}>Richardson Modificado (1974)</option>
           <option value="richardson_pos" ${p.modelo_frio==='richardson_pos'?'selected':''}>Richardson s/negativos</option>
