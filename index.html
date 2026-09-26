@@ -176,6 +176,17 @@ let PROD_DATA    = [];
 let FEN_DATA     = [];
 let LABORES_DATA = [];
 let HIDDEN_CAMPOS_FRIOGD = new Set(); // ids de campos ocultos en la vista Frio & GD
+let FORECAST_CACHE = {}; // {stationName: {ts, openmeteo:[...], yr:[...]}}
+
+// Ubicación aproximada por estación física, para pronóstico Open-Meteo / YR.
+// MACAYA: coordenadas reales de la estación (entregadas por el usuario).
+// El Carmen: usa San Fernando (ciudad más cercana) porque su estación es Agroclima.
+// Hacienda Ibacache: usa Ibacache, Melipilla, Región Metropolitana.
+const FORECAST_LOCATIONS = {
+  'MACAYA':            { lat: -34.63554, lon: -71.10718, label: 'MACAYA (ubicación de la estación)' },
+  'El Carmen':         { lat: -34.58121, lon: -70.98953, label: 'San Fernando, Chile' },
+  'Hacienda Ibacache': { lat: -33.5,     lon: -71.26667, label: 'Ibacache, Melipilla (RM)' },
+};
 
 // ================================================================
 // HELPERS
@@ -704,7 +715,31 @@ function clima() {
         <td>${fmt(r.solar_rad_wm2,0,' W/m²')}</td>
       </tr>`).join('')}</tbody>
     </table>
+  </div>
+  <div class="card" style="margin-top:14px;">
+    <div class="card-header">
+      <div class="card-title">🌦️ Pronóstico y heladas — 14 días</div>
+      <select class="sel" id="fc-st-sel" onchange="updateClimaForecast()">
+        ${Object.keys(FORECAST_LOCATIONS).map(k=>`<option value="${k}">${k}</option>`).join('')}
+      </select>
+    </div>
+    <div id="fc-loc-note" style="font-size:9px;color:var(--text3);margin-bottom:8px;"></div>
+    <div id="fc-frost-banner" style="margin-bottom:10px;"></div>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>Fecha</th><th colspan="3">Open-Meteo</th><th colspan="3">YR (met.no)</th><th>Riesgo</th></tr>
+      <tr><th></th><th>T.mín</th><th>T.máx</th><th>Lluvia</th><th>T.mín</th><th>T.máx</th><th>Lluvia</th><th>helada</th></tr></thead>
+      <tbody id="fc-tbody"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
+    </table>
+    </div>
+    <div style="margin-top:12px;"><canvas id="fcChart" style="height:220px;"></canvas></div>
+    <div style="font-size:9px;color:var(--text3);margin-top:4px;">
+      Pronóstico geográfico (no compara con tus estaciones): Open-Meteo y YR/met.no para la ubicación indicada arriba.
+      Riesgo de helada usa el mínimo entre ambas fuentes y tus umbrales configurados (Leve ${thr.frost_leve}°C · Moderada ${thr.frost_moderada}°C · Severa ${thr.frost_severa}°C).
+    </div>
   </div>`;
+
+  setTimeout(()=>{ updateClimaForecast(); }, 50);
 }
 
 function renderStationTiles(r) {
@@ -720,6 +755,192 @@ function updateClimaStation() {
   const idx = parseInt(el('clima-st-sel')?.value||0);
   const wrap = el('clima-readings');
   if (wrap) wrap.innerHTML = renderStationTiles(allSt[idx]||{});
+}
+
+// ================================================================
+// PRONÓSTICO 14 DÍAS — Open-Meteo vs YR (met.no)
+// Comparación entre ambas fuentes por ubicación geográfica.
+// No usa datos de tus estaciones: es pronóstico puro, para heladas futuras.
+// ================================================================
+async function fetchOpenMeteoForecast(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=14`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Open-Meteo '+r.status);
+  const j = await r.json();
+  const d = j.daily || {};
+  return (d.time||[]).map((f,i)=>({
+    fecha:  f,
+    tmin:   d.temperature_2m_min ? d.temperature_2m_min[i] : null,
+    tmax:   d.temperature_2m_max ? d.temperature_2m_max[i] : null,
+    lluvia: d.precipitation_sum  ? d.precipitation_sum[i]  : null,
+  }));
+}
+
+async function fetchYrForecast(lat, lon) {
+  const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('YR '+r.status);
+  const j = await r.json();
+  const porDia = {};
+  (j.properties?.timeseries||[]).forEach(ts=>{
+    const fecha = new Date(ts.time).toLocaleDateString('en-CA',{timeZone:'America/Santiago'});
+    if (!porDia[fecha]) porDia[fecha] = {fecha, tmin:null, tmax:null, lluvia:0};
+    const t = ts.data?.instant?.details?.air_temperature;
+    if (t!=null) {
+      porDia[fecha].tmin = porDia[fecha].tmin===null ? t : Math.min(porDia[fecha].tmin, t);
+      porDia[fecha].tmax = porDia[fecha].tmax===null ? t : Math.max(porDia[fecha].tmax, t);
+    }
+    const p6 = ts.data?.next_6_hours?.details?.precipitation_amount;
+    if (p6!=null) porDia[fecha].lluvia += p6;
+  });
+  return Object.values(porDia).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,14);
+}
+
+function fcRiesgoHelada(tmin, thr) {
+  if (tmin===null || tmin===undefined) return null;
+  if (tmin<=thr.frost_severa)   return {label:'Severa',   color:'var(--red)'};
+  if (tmin<=thr.frost_moderada) return {label:'Moderada', color:'var(--amber)'};
+  if (tmin<=thr.frost_leve)     return {label:'Leve',     color:'var(--frost)'};
+  return null;
+}
+
+// Alerta temprana por condiciones (no por historial de la estación):
+// no hay aún suficiente historial horario en la base (station_readings solo
+// tiene días sueltos) para derivar un modelo estadístico propio, así que esto
+// usa las condiciones clásicas de helada radiativa (cielo despejado + viento
+// calmo en la madrugada) sobre el pronóstico horario de Open-Meteo, que es lo
+// que de verdad determina si una noche fría termina en helada o no.
+async function fetchNoctData(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,cloud_cover&timezone=auto&forecast_days=14`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Open-Meteo horario '+r.status);
+  const j = await r.json();
+  const h = j.hourly || {};
+  const porNoche = {};
+  (h.time||[]).forEach((t,i)=>{
+    const hora = parseInt(t.slice(11,13),10);
+    if (!(hora>=21 || hora<=8)) return; // solo ventana de madrugada, donde se forma la helada radiativa
+    let fecha = t.slice(0,10);
+    if (hora>=21) { const nd=new Date(fecha+'T00:00:00'); nd.setDate(nd.getDate()+1); fecha=nd.toISOString().slice(0,10); }
+    if (!porNoche[fecha]) porNoche[fecha] = {viento:[], nubosidad:[]};
+    if (h.wind_speed_10m?.[i]!=null) porNoche[fecha].viento.push(h.wind_speed_10m[i]);
+    if (h.cloud_cover?.[i]!=null)    porNoche[fecha].nubosidad.push(h.cloud_cover[i]);
+  });
+  const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+  const out = {};
+  Object.entries(porNoche).forEach(([f,v])=>{ out[f] = {viento_prom:avg(v.viento), nubosidad_prom:avg(v.nubosidad)}; });
+  return out;
+}
+
+function fcCondicionesFavorables(noct) {
+  if (!noct) return null;
+  const calmo    = noct.viento_prom!=null && noct.viento_prom<8;
+  const despejado= noct.nubosidad_prom!=null && noct.nubosidad_prom<30;
+  return {calmo, despejado, favorable: calmo && despejado};
+}
+
+function fcFechaCorta(f) {
+  return new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'short',day:'2-digit',month:'2-digit'});
+}
+
+async function updateClimaForecast() {
+  const stationName = el('fc-st-sel')?.value || Object.keys(FORECAST_LOCATIONS)[0];
+  const loc = FORECAST_LOCATIONS[stationName];
+  const tbody   = el('fc-tbody');
+  const banner  = el('fc-frost-banner');
+  const locNote = el('fc-loc-note');
+  if (!loc) return;
+  if (locNote) locNote.textContent = `📍 Ubicación usada: ${loc.label} (${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)})`;
+  if (tbody)  tbody.innerHTML  = `<tr><td colspan="8" class="empty">Cargando pronóstico…</td></tr>`;
+  if (banner) banner.innerHTML = '';
+
+  const cached = FORECAST_CACHE[stationName];
+  const fresh  = cached && (Date.now()-cached.ts) < 30*60*1000;
+  let om, yrData, noct;
+  if (fresh) {
+    om = cached.openmeteo; yrData = cached.yr; noct = cached.noct;
+  } else {
+    const [omR, yrR, noctR] = await Promise.allSettled([
+      fetchOpenMeteoForecast(loc.lat, loc.lon),
+      fetchYrForecast(loc.lat, loc.lon),
+      fetchNoctData(loc.lat, loc.lon),
+    ]);
+    om     = omR.status==='fulfilled'   ? omR.value   : null;
+    yrData = yrR.status==='fulfilled'   ? yrR.value   : null;
+    noct   = noctR.status==='fulfilled' ? noctR.value : null;
+    FORECAST_CACHE[stationName] = {ts:Date.now(), openmeteo:om, yr:yrData, noct};
+  }
+
+  if (!om && !yrData) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty">No se pudo obtener el pronóstico (sin conexión a Open-Meteo ni YR ahora mismo)</td></tr>`;
+    return;
+  }
+
+  const thr = (myProfile().thresholds)||{frost_leve:-2,frost_moderada:-4,frost_severa:-6,rain_alert_mm:15};
+  const fechas    = Array.from(new Set([...(om||[]).map(d=>d.fecha), ...(yrData||[]).map(d=>d.fecha)])).sort();
+  const omByFecha = Object.fromEntries((om||[]).map(d=>[d.fecha,d]));
+  const yrByFecha = Object.fromEntries((yrData||[]).map(d=>[d.fecha,d]));
+  const heladas   = [];
+
+  if (tbody) {
+    tbody.innerHTML = fechas.map(f=>{
+      const o = omByFecha[f]||{}, y = yrByFecha[f]||{};
+      const candidatos = [o.tmin,y.tmin].filter(v=>v!=null);
+      const tminMin = candidatos.length ? Math.min(...candidatos) : null;
+      const riesgo  = fcRiesgoHelada(tminMin, thr);
+      const cond    = fcCondicionesFavorables(noct?.[f]);
+      if (riesgo) heladas.push({fecha:f, tmin:tminMin, cond, ...riesgo});
+      let riesgoHtml = '—';
+      if (riesgo) {
+        riesgoHtml = `<span style="color:${riesgo.color};font-weight:700;">❄️ ${riesgo.label}</span>`;
+        if (cond) riesgoHtml += cond.favorable
+          ? `<div style="font-size:9px;color:var(--red);">cielo despejado + viento calmo</div>`
+          : `<div style="font-size:9px;color:var(--text3);">${!cond.despejado?'con nubosidad':''}${!cond.despejado&&!cond.calmo?' / ':''}${!cond.calmo?'con viento':''} (menor confianza)</div>`;
+      }
+      return `<tr style="${riesgo?'background:'+riesgo.color+'14;':''}">
+        <td style="font-weight:600;">${fcFechaCorta(f)}</td>
+        <td>${fmt(o.tmin,1,'°C')}</td><td>${fmt(o.tmax,1,'°C')}</td><td>${fmt(o.lluvia,1,'mm')}</td>
+        <td>${fmt(y.tmin,1,'°C')}</td><td>${fmt(y.tmax,1,'°C')}</td><td>${fmt(y.lluvia,1,'mm')}</td>
+        <td>${riesgoHtml}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="8" class="empty">Sin datos</td></tr>`;
+  }
+
+  if (banner) {
+    const altaConfianza = heladas.filter(h=>h.cond?.favorable);
+    banner.innerHTML = heladas.length ? `
+      <div class="alert a-red">
+        <span style="font-size:16px;">🧊</span>
+        <div><div class="alert-title">Heladas previstas — próximos 14 días</div>
+          <div style="color:var(--text);">${heladas.map(h=>`${fcFechaCorta(h.fecha)}: ${h.label} (${fmt(h.tmin,1)}°C)${h.cond?.favorable?' ⚠️':''}`).join(' · ')}</div>
+          ${altaConfianza.length?`<div style="margin-top:4px;font-size:10px;color:var(--red);">⚠️ = además cielo despejado y viento calmo (mayor probabilidad real de helada)</div>`:''}
+        </div>
+      </div>` : `
+      <div class="alert a-green">
+        <span style="font-size:16px;">✅</span>
+        <div><div class="alert-title">Sin riesgo de helada previsto</div>
+          <div style="color:var(--text);">Próximos 14 días, según Open-Meteo / YR, para ${loc.label}</div></div>
+      </div>`;
+  }
+
+  buildForecastChart(fechas, omByFecha, yrByFecha);
+}
+
+function buildForecastChart(fechas, omByFecha, yrByFecha) {
+  const ctx = el('fcChart');
+  if (!ctx) return;
+  if (CHARTS.fc) CHARTS.fc.destroy();
+  const labels = fechas.map(fcFechaCorta);
+  CHARTS.fc = new Chart(ctx,{type:'line',data:{labels,datasets:[
+    {label:'T.mín Open-Meteo', data:fechas.map(f=>omByFecha[f]?.tmin??null), borderColor:'#2471a3', backgroundColor:'#2471a320', fill:false, tension:.3, borderWidth:2, pointRadius:3},
+    {label:'T.mín YR',         data:fechas.map(f=>yrByFecha[f]?.tmin??null), borderColor:'#c0392b', backgroundColor:'#c0392b20', fill:false, tension:.3, borderWidth:2, pointRadius:3, borderDash:[5,3]},
+    {label:'T.máx Open-Meteo', data:fechas.map(f=>omByFecha[f]?.tmax??null), borderColor:'#8a6200', backgroundColor:'transparent', fill:false, tension:.3, borderWidth:1.5, pointRadius:2},
+    {label:'T.máx YR',         data:fechas.map(f=>yrByFecha[f]?.tmax??null), borderColor:'#7c3aed', backgroundColor:'transparent', fill:false, tension:.3, borderWidth:1.5, pointRadius:2, borderDash:[5,3]},
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+    scales:{y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}},
+      x:{grid:{color:'rgba(0,100,200,.12)',lineWidth:1.5},ticks:{font:{size:9}}}}}});
 }
 
 // ================================================================
