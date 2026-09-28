@@ -270,10 +270,27 @@ function frioAcumCampo(campoId, year, modeloField) {
   if (!rows.length) return null;
   return rows.reduce((s,r)=>s+(r[modeloField]||0),0);
 }
+// Comparativo justo: solo las quincenas cuyo fin cae hasta el mismo día-mes
+// de hoy (si ya pasó toda la temporada de frío, corteMD='MM-DD' de hoy será
+// mayor a fecha_fin de todas las quincenas de todos modos, así que el
+// resultado es igual al total completo — no cambia nada fuera de temporada).
+function frioAcumCampoHastaFecha(campoId, year, modeloField, corteMD) {
+  const rows = FRIO_CAMPOS.filter(f=>f.campo_id===campoId&&f.year===year&&String(f.fecha_fin).slice(5,10)<=corteMD);
+  if (!rows.length) return null;
+  return rows.reduce((s,r)=>s+(r[modeloField]||0),0);
+}
 function gdAcumCampo(campoId, year) {
   const rows = GD_CAMPOS.filter(g=>g.campo_id===campoId&&g.year===year);
   if (!rows.length) return null;
   return rows.slice(-1)[0]?.gd_acum ?? null;
+}
+// Comparativo justo con la temporada anterior: el acumulado de GD SOLO hasta
+// el mismo día-mes de hoy (no el total de toda la temporada anterior), para
+// comparar manzanas con manzanas mientras la temporada actual está en curso.
+function gdAcumCampoHastaFecha(campoId, year, corteMD) {
+  const rows = GD_CAMPOS.filter(g=>g.campo_id===campoId&&g.year===year&&String(g.fecha).slice(5,10)<=corteMD);
+  if (!rows.length) return null;
+  return rows[rows.length-1]?.gd_acum ?? null;
 }
 function readingForCampo(c, rdgs) {
   return rdgs.find(r =>
@@ -662,14 +679,15 @@ function updateDashFrio() {
     return;
   }
   const acum = frioAcumCampo(campoId, y, modelo);
-  const acumPrev = frioAcumCampo(campoId, y-1, modelo);
+  const hoyMD = new Date().toISOString().slice(5,10);
+  const acumPrev = frioAcumCampoHastaFecha(campoId, y-1, modelo, hoyMD);
   if (acum===null) {
     body.innerHTML = `<div style="font-size:10px;color:var(--text3);">Sin datos de frío para ${c.nombre} en ${szn()} — falta correr agrosuite_campos_sync.py</div>`;
     return;
   }
   body.innerHTML = `
     <div class="metric-val">${fmt(acum,1)}</div>
-    <div class="metric-sub">T. anterior: ${acumPrev===null?'sin datos':fmt(acumPrev,1)}</div>`;
+    <div class="metric-sub">T. anterior a la misma fecha: ${acumPrev===null?'sin datos':fmt(acumPrev,1)}</div>`;
 }
 
 function updateDashGD() {
@@ -683,7 +701,8 @@ function updateDashGD() {
     return;
   }
   const gd = gdAcumCampo(campoId, y);
-  const gdPrev = gdAcumCampo(campoId, y-1);
+  const hoyMD = new Date().toISOString().slice(5,10);
+  const gdPrev = gdAcumCampoHastaFecha(campoId, y-1, hoyMD);
   if (gd===null) {
     body.innerHTML = `<div style="font-size:10px;color:var(--text3);">Sin datos de GD para ${c.nombre} — falta correr agrosuite_campos_sync.py</div>`;
     return;
@@ -691,7 +710,7 @@ function updateDashGD() {
   body.innerHTML = `
     <div class="metric-val">${fmt(gd,1)}</div>
     <div class="metric-sub">Base ${c.base_grados_dia||10.2}°C · desde 1/8</div>
-    <div class="metric-sub">T. anterior: ${gdPrev===null?'sin datos':fmt(gdPrev,1)}</div>`;
+    <div class="metric-sub">T. anterior a la misma fecha: ${gdPrev===null?'sin datos':fmt(gdPrev,1)}</div>`;
 }
 
 let LLUVIA_CACHE = null; // {ts, porDia} — compartido entre Dashboard y Clima & Alertas
