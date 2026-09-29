@@ -1234,7 +1234,7 @@ function frio() {
       <table>
         <thead><tr><th>Campo</th><th>Estación</th>
           <th>1ª May</th><th>1ª Jun</th><th>2ª Jun</th><th>1ª Jul</th><th>2ª Jul</th>
-          <th>Total ${y}</th><th>Total ${y-1}</th><th>Δ</th></tr></thead>
+          <th>Total ${y}</th><th>${y-1} a la misma fecha</th><th>Δ</th></tr></thead>
         <tbody id="frio-tbody"></tbody>
       </table>
       </div>
@@ -1247,7 +1247,7 @@ function frio() {
       <div class="card-header"><div class="card-title">🌡️ Grados Día acumulados por campo — Base 10.2°C · desde 1/8</div></div>
       <div style="overflow-x:auto;">
       <table>
-        <thead><tr><th>Campo</th><th>Estación</th><th>GD acum. ${y}</th><th>GD acum. ${y-1}</th><th>Δ</th></tr></thead>
+        <thead><tr><th>Campo</th><th>Estación</th><th>GD acum. ${y}</th><th>GD ${y-1} a la misma fecha</th><th>Δ</th></tr></thead>
         <tbody id="gd-tbody"></tbody>
       </table>
       </div>
@@ -1300,7 +1300,8 @@ function updateFrioTable() {
       if(v!==null) acum+=v;
       return v;
     });
-    const acumPrev = frioAcumCampo(c.id, y-1, modelo);
+    const hoyMD = new Date().toISOString().slice(5,10);
+    const acumPrev = frioAcumCampoHastaFecha(c.id, y-1, modelo, hoyMD);
     const delta = acumPrev!==null && acum>0 ? acum-acumPrev : null;
     return `<tr>
       <td style="font-weight:600;">${c.nombre}</td>
@@ -1365,9 +1366,10 @@ function updateGDView() {
   const y = yr();
   const visibles = CAMPOS.filter(c=>!HIDDEN_CAMPOS_FRIOGD.has(c.id));
 
+  const hoyMD = new Date().toISOString().slice(5,10);
   tbody.innerHTML = visibles.map(c=>{
     const gd = gdAcumCampo(c.id, y);
-    const gdPrev = gdAcumCampo(c.id, y-1);
+    const gdPrev = gdAcumCampoHastaFecha(c.id, y-1, hoyMD);
     const delta = gd!==null && gdPrev!==null ? gd-gdPrev : null;
     return `<tr>
       <td style="font-weight:600;">${c.nombre}</td>
