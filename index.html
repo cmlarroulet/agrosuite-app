@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgroSuite</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2d6a2d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AgroSuite">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -90,10 +100,67 @@ label{font-size:11px;font-weight:600;display:block;margin-bottom:4px;color:var(-
 .stat-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
 .stat-row:last-child{border-bottom:none;}
 .empty{color:var(--text3);font-size:11px;padding:12px 0;text-align:center;}
+
+/* ================================================================
+   MÓVIL — el layout base de arriba es de escritorio (sidebar fija,
+   grids de 2/3/4 columnas). Debajo de 860px el sidebar se convierte
+   en un cajón (drawer) que se abre con el botón ☰, y las grillas se
+   apilan en una sola columna para que las tarjetas y tablas se vean
+   bien en una pantalla angosta.
+   ================================================================ */
+#hamburger{display:none;}
+#sidebar-overlay{display:none;}
+@media (max-width: 860px) {
+  #hamburger{display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+    border-radius:var(--r);border:1px solid var(--border2);background:var(--card);
+    font-size:16px;cursor:pointer;flex-shrink:0;}
+  #app{position:relative;}
+  #sidebar{position:fixed;top:0;left:0;bottom:0;z-index:501;width:230px;max-width:80vw;
+    transform:translateX(-100%);transition:transform .2s ease;box-shadow:2px 0 16px rgba(0,0,0,.2);}
+  #sidebar.open{transform:translateX(0);}
+  #sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);
+    z-index:500;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  #sidebar-overlay.show{opacity:1;pointer-events:auto;}
+
+  #topbar{height:auto;min-height:50px;padding:8px 10px;flex-wrap:wrap;row-gap:6px;}
+  .page-title{font-size:13px;flex:1 1 auto;}
+  #upd-badge{display:none;}
+  #topbar .tbtn{font-size:10px;padding:0 8px;height:30px;}
+  #topbar .sel{height:30px;font-size:11px;}
+
+  #content{padding:10px;}
+  .card{padding:11px;margin-bottom:10px;}
+  .card-header{margin-bottom:9px;}
+  .card-title{font-size:11px;}
+  .g2,.g3,.g4{grid-template-columns:1fr;gap:10px;}
+  .metric{padding:11px;}
+  .metric-val{font-size:19px;}
+
+  /* Los inputs/selects a 16px evitan que iOS Safari haga zoom automático
+     al enfocarlos — con font-size menor a 16px, Safari agranda toda la
+     página al tocar un campo, que es justo lo que se ve "poco amena". */
+  input,select,textarea{font-size:16px;}
+  .sel{font-size:12px;}
+
+  table{font-size:10.5px;}
+  th,td{padding:5px 6px;}
+  .tbtn{padding:0 8px;}
+
+  /* El modal (showModal) ocupa casi todo el ancho y queda pegado arriba,
+     no centrado, para que el teclado en pantalla no lo tape. */
+  .modal-overlay{align-items:flex-start!important;padding-top:14px!important;}
+  .modal-box{width:100%!important;max-width:100%!important;margin:0 8px;}
+}
+@media (max-width: 420px) {
+  .metric-val{font-size:17px;}
+  .card-title{font-size:10.5px;}
+  .g4{grid-template-columns:1fr 1fr;} /* 4 métricas en 2x2 en vez de 1 columna larga */
+}
 </style>
 </head>
 <body>
 <div id="app">
+<div id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
 <div id="sidebar">
   <div class="logo">
     <div class="logo-icon">A</div>
@@ -134,6 +201,7 @@ label{font-size:11px;font-weight:600;display:block;margin-bottom:4px;color:var(-
 </div>
 <div id="main">
   <div id="topbar">
+    <div id="hamburger" onclick="toggleSidebar()">☰</div>
     <span class="page-title" id="ptitle">Dashboard</span>
     <span id="upd-badge" style="font-size:10px;color:var(--text3);">—</span>
     <span class="tbadge tb-green" id="status-badge">● —</span>
@@ -175,6 +243,7 @@ let PODA_DATA    = [];
 let PROD_DATA    = [];
 let FEN_DATA     = [];
 let LABORES_DATA = [];
+let ALERTAS_ACUM  = []; // frio_alerts: alertas de frío Y de grados-día (campo modelo='gd')
 let HIDDEN_CAMPOS_FRIOGD = new Set(); // ids de campos ocultos en la vista Frio & GD
 let FORECAST_CACHE = {}; // {stationName: {ts, openmeteo:[...], yr:[...]}}
 
@@ -292,6 +361,42 @@ function gdAcumCampoHastaFecha(campoId, year, corteMD) {
   if (!rows.length) return null;
   return rows[rows.length-1]?.gd_acum ?? null;
 }
+
+// ---- Alertas de acumulación (frío o grados-día) por campo ----
+// frio_alerts.modelo puede ser 'horas' | 'richardson' | 'utah' (frío) o 'gd'
+// (grados-día) — mismo registro, mismo umbral, distinto valor a comparar.
+const MODELO_FRIO_FIELD = {horas:'horas_frio', richardson:'richardson', utah:'dynamic_model'};
+function labelModeloAlerta(modelo) {
+  return modelo==='gd' ? 'Grados Día'
+    : modelo==='utah' ? 'Porciones de Frío'
+    : modelo==='richardson' ? 'Richardson Mod.'
+    : 'Horas Frío';
+}
+function valorAcumuladoParaAlerta(a) {
+  const y = yr();
+  if (a.modelo==='gd') return gdAcumCampo(a.campo_id, y);
+  return frioAcumCampo(a.campo_id, y, MODELO_FRIO_FIELD[a.modelo]||'horas_frio');
+}
+// Revisa cada alerta activa y no disparada contra el acumulado real de su
+// campo; si se cruzó el umbral, la marca como disparada en Supabase y avisa
+// al usuario. Se llama después de cada loadAll(), así que una alerta ya
+// disparada no vuelve a avisar en la sesión siguiente (queda con 🔔 en la
+// página Alertas hasta que el usuario la elimine).
+async function checkAlertasAcumulacion() {
+  const pendientes = ALERTAS_ACUM.filter(a=>a.activa && !a.disparada);
+  if (!pendientes.length) return;
+  for (const a of pendientes) {
+    const valor = valorAcumuladoParaAlerta(a);
+    if (valor===null || valor < a.umbral) continue;
+    try {
+      await sb('PATCH',`frio_alerts?id=eq.${a.id}`,{disparada:true});
+      a.disparada = true;
+      const campo = CAMPOS.find(c=>c.id===a.campo_id);
+      const msg = a.mensaje ? `\n"${a.mensaje}"` : '';
+      alert(`🔔 Alerta de acumulación\n${labelModeloAlerta(a.modelo)} en ${campo?.nombre||'campo'} alcanzó ${fmt(valor,1)} (umbral: ${a.umbral}).${msg}`);
+    } catch(e) { console.error('checkAlertasAcumulacion:', e); }
+  }
+}
 function readingForCampo(c, rdgs) {
   return rdgs.find(r =>
     (c.estacion_tipo==='davis' && c.davis_station_id && String(r.station_id)===String(c.davis_station_id)) ||
@@ -335,7 +440,7 @@ async function loadAll() {
   if (!SESSION) { showLogin(); return; }
   const y = yr();
   try {
-    const [snap,chills,users,campos,cuarteles,frio,gd,poda,prod,fen,labores] = await Promise.all([
+    const [snap,chills,users,campos,cuarteles,frio,gd,poda,prod,fen,labores,alertasAcum] = await Promise.all([
       sb('GET','weather_snapshots?order=created_at.desc&limit=1'),
       sb('GET','chill_readings?order=recorded_at.desc&limit=500'),
       sb('GET','usuarios?active=eq.true&order=nombre'),
@@ -347,6 +452,7 @@ async function loadAll() {
       sb('GET','produccion_prod?order=cuartel_id,year'),
       sb('GET','fenologia_prod?order=cuartel_id,year'),
       sb('GET','labores?order=fecha_inicio.asc').catch(()=>[]),
+      sb('GET','frio_alerts?activa=eq.true').catch(()=>[]),
     ]);
 
     if (snap&&snap[0]) WEATHER = snap[0].payload;
@@ -360,6 +466,7 @@ async function loadAll() {
     PROD_DATA    = prod||[];
     FEN_DATA     = fen||[];
     LABORES_DATA = labores||[];
+    ALERTAS_ACUM = alertasAcum||[];
 
     // Chill by user (latest per user)
     const rdgs = getAllReadings();
@@ -369,6 +476,7 @@ async function loadAll() {
     el('status-badge').className   = 'tbadge '+(ok===rdgs.length?'tb-green':ok>0?'tb-amber':'tb-red');
 
     renderPage();
+    checkAlertasAcumulacion();
   } catch(e) {
     console.error('loadAll:', e);
     el('status-badge').textContent = '● Error';
@@ -394,8 +502,19 @@ document.querySelectorAll('.nav-item').forEach(item => {
     el('ptitle').textContent = titles[PAGE]||PAGE;
     destroyCharts();
     renderPage();
+    toggleSidebar(false); // en móvil, elegir una página cierra el cajón lateral
   });
 });
+
+// Cajón lateral (drawer) para móvil — en escritorio el CSS ya mantiene el
+// sidebar siempre visible, así que esto solo tiene efecto bajo los 860px.
+function toggleSidebar(force) {
+  const sb = el('sidebar'), ov = el('sidebar-overlay');
+  if (!sb || !ov) return;
+  const open = typeof force === 'boolean' ? force : !sb.classList.contains('open');
+  sb.classList.toggle('open', open);
+  ov.classList.toggle('show', open);
+}
 
 function renderPage() {
   if (!SESSION) { showLogin(); return; }
@@ -1505,7 +1624,7 @@ async function editPoda(cuartel_id) {
     const n_plantas=deh&&dsh?Math.round(10000/(deh*dsh)):(parseInt(el('ep-pl').value)||q.n_plantas||1250);
     await sb('PATCH',`cuarteles_prod?id=eq.${cuartel_id}`,{sistema:el('ep-s').value,deh,dsh,n_plantas});
     const payload={
-      cuartel_id,campo_id:q.campo_id,year:y,
+      cuartel_id,year:y,
       conteo_dardos:parseFloat(el('ep-d').value)||null,
       flores_dardo:parseFloat(el('ep-f').value)||null,
       intensidad_pct:parseFloat(el('ep-i').value)||null,
@@ -1539,7 +1658,7 @@ async function addPoda() {
     </div>`,async()=>{
     const cid=parseInt(el('ap-c').value);
     const c=CUARTELES.find(x=>x.id===cid);
-    await sb('POST','poda_prod',{cuartel_id:cid,campo_id:c?.campo_id,year:yr(),
+    await sb('POST','poda_prod',{cuartel_id:cid,year:yr(),
       conteo_dardos:parseFloat(el('ap-d').value)||null,
       flores_dardo:parseFloat(el('ap-f').value)||null,
       intensidad_pct:parseFloat(el('ap-i').value)||null,
@@ -1661,7 +1780,7 @@ async function addProd() {
     const c=CUARTELES.find(x=>x.id===cid);
     const kgha=parseFloat(el('pr-k').value)||0;
     const yy=parseInt(el('pr-y').value)||yr();
-    await sb('POST','produccion_prod',{cuartel_id:cid,campo_id:c?.campo_id,year:yy,
+    await sb('POST','produccion_prod',{cuartel_id:cid,year:yy,
       kg_ha:kgha,kg_totales:kgha*(c?.has||1),notas:el('pr-n').value,usuario_id:myProfile().id});
     await loadAll(); produccion();
   });
@@ -1830,24 +1949,33 @@ function buildGantt(data) {
   const minD=new Date(Math.min(...allStarts));
   const maxD=new Date(Math.max(...allEnds));
   const totalDays=Math.ceil((maxD-minD)/86400000)+7;
-  const px=16,barH=22,labelW=140;
-  const W=Math.max(600,totalDays*px+labelW+20);
-  const H=withDates.length*(barH+4)+40;
+  // labelW más ancho + etiqueta en 2 líneas (labor / campo · huerto) para que
+  // se vea qué labor es y de qué huerto, no solo la fecha y el campo.
+  const px=16,barH=30,labelW=230;
+  const W=Math.max(700,totalDays*px+labelW+20);
+  const H=withDates.length*(barH+6)+40;
   const cols=['#2d6a2d','#2471a3','#8a6200','#c0392b','#7c3aed','#0891b2'];
+  const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const bars=withDates.map((l,i)=>{
     const s=Math.ceil((new Date(l.fecha_inicio)-minD)/86400000);
     const endD=l.fecha_fin?new Date(l.fecha_fin):new Date(new Date(l.fecha_inicio).getTime()+7*86400000);
     const dur=Math.max(1,Math.ceil((endD-new Date(l.fecha_inicio))/86400000));
     const x=labelW+s*px; const w=Math.max(3,dur*px);
-    const y2=i*(barH+4)+20;
+    const y2=i*(barH+6)+20;
     const col=l.terminada?'#2d6a2d':cols[i%cols.length];
     const campo=CAMPOS.find(c=>c.id===l.campo_id);
-    const lbl=`${l.nombre}${campo?' ('+campo.nombre+')':''}`;
+    const cuartel=CUARTELES.find(c=>c.id===l.cuartel_id);
+    const huerto=cuartel?cuartel.nombre:(campo?'Campo general':'—');
+    const labor=l.nombre||'(Sin nombre)';
+    const linea2=`${campo?campo.nombre:'?'} · ${huerto}`;
+    const rango=`${l.fecha_inicio}${l.fecha_fin?' → '+l.fecha_fin:' — en curso'}`;
     return `<g>
-      <text x="${labelW-4}" y="${y2+14}" text-anchor="end" font-size="9" fill="#4a5e4a">${lbl.length>20?lbl.slice(0,19)+'…':lbl}</text>
+      <title>${esc(labor)} — ${esc(linea2)} (${esc(rango)})</title>
+      <text x="${labelW-6}" y="${y2+12}" text-anchor="end" font-size="9.5" font-weight="700" fill="#2d3d2d">${esc(labor.length>28?labor.slice(0,27)+'…':labor)}</text>
+      <text x="${labelW-6}" y="${y2+24}" text-anchor="end" font-size="8.5" fill="#6b7d6b">${esc(linea2.length>34?linea2.slice(0,33)+'…':linea2)}</text>
       <rect x="${x}" y="${y2}" width="${w}" height="${barH}" fill="${col}" opacity="${l.terminada?1:.75}" rx="3"/>
-      <text x="${x+3}" y="${y2+13}" font-size="8" fill="white">${l.fecha_inicio.slice(5)}${l.fecha_fin?' → '+l.fecha_fin.slice(5):''}</text>
+      <text x="${x+3}" y="${y2+barH/2+3}" font-size="8" fill="white">${l.fecha_inicio.slice(5)}${l.fecha_fin?' → '+l.fecha_fin.slice(5):''}</text>
     </g>`;
   }).join('');
 
@@ -1855,7 +1983,8 @@ function buildGantt(data) {
     <svg width="${W}" height="${H}" style="font-family:Segoe UI,sans-serif;">
       <line x1="${labelW}" y1="0" x2="${labelW}" y2="${H}" stroke="#dde3dd" stroke-width="1"/>
       ${bars}
-    </svg></div>`;
+    </svg></div>
+  <div style="font-size:9px;color:var(--text3);margin-top:4px;padding:0 8px;">Pasa el mouse sobre cada barra para ver el detalle completo (labor, campo, huerto y fechas).</div>`;
 }
 
 async function addLabor() {
@@ -2325,21 +2454,22 @@ async function alertas() {
   </div>
   <div class="card" style="margin-bottom:14px;">
     <div class="card-header">
-      <div class="card-title">❄️ Alertas por acumulación de frío</div>
+      <div class="card-title">❄️🌡️ Alertas de acumulación (Frío / Grados Día)</div>
       <button class="tbtn tbtn-primary" onclick="addFrioAlert()">+ Agregar</button>
     </div>
     ${frioAlerts.length?frioAlerts.map(a=>{
       const campo=CAMPOS.find(c=>c.id===a.campo_id);
+      const valorActual=valorAcumuladoParaAlerta(a);
       return `<div class="stat-row">
-        <span style="font-size:16px;">❄️</span>
+        <span style="font-size:16px;">${a.modelo==='gd'?'🌡️':'❄️'}</span>
         <div style="flex:1;">
-          <div style="font-size:11px;font-weight:600;">${campo?.nombre||'?'} — cuando llegue a ${a.umbral} unidades (${a.modelo})</div>
+          <div style="font-size:11px;font-weight:600;">${campo?.nombre||'?'} — ${labelModeloAlerta(a.modelo)}: avisar al llegar a ${a.umbral}${valorActual!=null?` (actual: ${fmt(valorActual,1)})`:''}</div>
           <div style="font-size:10px;color:var(--text3);">${a.mensaje||'Sin mensaje'}</div>
         </div>
         <span class="tbadge ${a.disparada?'tb-red':a.activa?'tb-green':'tb-amber'}">${a.disparada?'🔔 Disparada':a.activa?'Activa':'Inactiva'}</span>
         <button class="tbtn" style="font-size:10px;" onclick="eliminarAlerta(${a.id})">🗑️</button>
       </div>`;
-    }).join(''):'<div class="empty">Sin alertas de frío configuradas</div>'}
+    }).join(''):'<div class="empty">Sin alertas configuradas</div>'}
   </div>`;
 }
 
@@ -2358,14 +2488,15 @@ async function saveThresholds(){
 
 function addFrioAlert(){
   const campoOpts=CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
-  showModal('Alerta de frío acumulado',`
+  showModal('Alerta de acumulación (Frío o Grados Día)',`
     <div style="display:grid;gap:8px;">
       <div><label>Campo</label><select id="fa-campo">${campoOpts}</select></div>
-      <div><label>Modelo</label>
+      <div><label>Qué medir</label>
         <select id="fa-modelo">
-          <option value="horas">Horas Frío</option>
-          <option value="richardson">Richardson Modificado</option>
-          <option value="utah">Porciones de Frío (Dynamic Model)</option>
+          <option value="horas">❄️ Horas Frío</option>
+          <option value="richardson">❄️ Richardson Modificado</option>
+          <option value="utah">❄️ Porciones de Frío (Dynamic Model)</option>
+          <option value="gd">🌡️ Grados Día</option>
         </select></div>
       <div><label>Umbral de acumulación</label>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -2382,6 +2513,7 @@ function addFrioAlert(){
       umbral:parseFloat(el('fa-val').value)||0,
       mensaje:el('fa-msg').value,
     });
+    await loadAll();
     alertas();
   });
 }
@@ -2545,17 +2677,34 @@ async function usuarios(){
 // ================================================================
 function showModal(title, body, onOk){
   const ov=document.createElement('div');
+  ov.className='modal-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
-  ov.innerHTML=`<div style="background:var(--card);border-radius:var(--r2);border:1px solid var(--border);padding:20px;width:500px;max-width:100%;max-height:90vh;overflow-y:auto;">
+  ov.innerHTML=`<div class="modal-box" style="background:var(--card);border-radius:var(--r2);border:1px solid var(--border);padding:20px;width:500px;max-width:100%;max-height:90vh;overflow-y:auto;">
     <div style="font-size:14px;font-weight:700;margin-bottom:14px;">${title}</div>
     ${body}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
-      <button class="tbtn" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="tbtn" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
       <button id="m-ok" class="tbtn tbtn-primary">Guardar</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
-  el('m-ok').onclick=()=>{try{onOk();}catch(e){console.error(e);}ov.remove();};
+  // onOk suele ser async (llama a Supabase) — hay que esperarlo antes de
+  // cerrar el modal. Si no se espera, el modal se cierra de inmediato y
+  // cualquier error de guardado queda como una promesa no capturada: el
+  // usuario ve el modal cerrarse como si todo hubiera salido bien aunque
+  // el dato nunca haya llegado a la base de datos.
+  const btnOk = el('m-ok');
+  const label0 = btnOk.textContent;
+  btnOk.onclick = async () => {
+    btnOk.disabled = true; btnOk.textContent = 'Guardando…';
+    try {
+      await onOk();
+      ov.remove();
+    } catch (e) {
+      console.error(e);
+      btnOk.disabled = false; btnOk.textContent = label0;
+    }
+  };
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
 }
 

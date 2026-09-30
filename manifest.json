@@ -1,0 +1,16 @@
+{
+  "name": "AgroSuite",
+  "short_name": "AgroSuite",
+  "description": "Gestión agrícola: labores, costos, clima y alertas de campo.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f0f2f0",
+  "theme_color": "#2d6a2d",
+  "orientation": "any",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
