@@ -1730,14 +1730,14 @@ function produccion() {
               ${prods.map((p,i)=>{
                 const yx=years[i];
                 if (p) {
-                  return `<td style="color:${yx===y?'var(--green)':'var(--text)'};font-weight:${yx===y?'700':'400'};">
-                    ${fmt(p.kg_ha,0)}<div style="font-size:9px;color:var(--text3);">real ingresado</div></td>`;
+                  return `<td style="color:${yx===y?'var(--green)':'var(--text)'};font-weight:${yx===y?'700':'400'};cursor:pointer;" onclick="editProd(${q.id},${yx})" title="Click para editar">
+                    ${fmt(p.kg_ha,0)} ✏️<div style="font-size:9px;color:var(--text3);">real ingresado</div></td>`;
                 }
                 if (yx===y && est) {
-                  return `<td style="color:var(--amber);font-style:italic;">
-                    ${est.toLocaleString()}<div style="font-size:9px;color:var(--text3);">estimado = dardos×pl/ha×0.011×frutos/dardo</div></td>`;
+                  return `<td style="color:var(--amber);font-style:italic;cursor:pointer;" onclick="editProd(${q.id},${yx})" title="Click para ingresar el dato real">
+                    ${est.toLocaleString()}<div style="font-size:9px;color:var(--text3);">estimado — click para ingresar real</div></td>`;
                 }
-                return `<td style="color:var(--text3);">—</td>`;
+                return `<td style="color:var(--text3);cursor:pointer;" onclick="editProd(${q.id},${yx})" title="Click para ingresar dato">— ✏️</td>`;
               }).join('')}
               <td style="font-weight:700;color:${delta===null?'var(--text3)':delta>=0?'var(--green)':'var(--red)'};">
                 ${delta===null?'—':(delta>=0?'+':'')+Math.round(delta)}</td>
@@ -1775,13 +1775,34 @@ async function addProd() {
       <div><label>Año temporada (inicio)</label><input id="pr-y" type="number" value="${yr()}"></div>
       <div><label>kg/ha cosechados (real)</label><input id="pr-k" type="number" placeholder="Ej: 40000"></div>
       <div><label>Notas</label><input id="pr-n" type="text" placeholder="Real / Proyectado / Estimado..."></div>
+      <div style="font-size:10px;color:var(--text3);">Si el cuartel y la temporada elegidos ya tienen un dato cargado, esto lo reemplaza (no crea un duplicado).</div>
     </div>`,async()=>{
     const cid=parseInt(el('pr-c').value);
     const c=CUARTELES.find(x=>x.id===cid);
     const kgha=parseFloat(el('pr-k').value)||0;
     const yy=parseInt(el('pr-y').value)||yr();
-    await sb('POST','produccion_prod',{cuartel_id:cid,year:yy,
-      kg_ha:kgha,kg_totales:kgha*(c?.has||1),notas:el('pr-n').value,usuario_id:myProfile().id});
+    const existing=PROD_DATA.find(p=>p.cuartel_id===cid&&p.year===yy);
+    const payload={cuartel_id:cid,year:yy,
+      kg_ha:kgha,kg_totales:kgha*(c?.has||1),notas:el('pr-n').value,usuario_id:myProfile().id};
+    if (existing?.id) await sb('PATCH',`produccion_prod?id=eq.${existing.id}`,payload);
+    else await sb('POST','produccion_prod',payload);
+    await loadAll(); produccion();
+  });
+}
+
+async function editProd(cuartel_id, year) {
+  const q=CUARTELES.find(c=>c.id===cuartel_id)||{};
+  const pr=PROD_DATA.find(p=>p.cuartel_id===cuartel_id&&p.year===year);
+  showModal(`✏️ Producción — ${q.nombre||'Cuartel'} · ${year}/${String(year+1).slice(-2)}`,`
+    <div style="display:grid;gap:8px;">
+      <div><label>kg/ha cosechados (real)</label><input id="ep2-k" type="number" value="${pr?.kg_ha||''}" placeholder="Ej: 40000"></div>
+      <div><label>Notas</label><input id="ep2-n" type="text" value="${pr?.notas||''}" placeholder="Real / Proyectado / Estimado..."></div>
+    </div>`,async()=>{
+    const kgha=parseFloat(el('ep2-k').value)||0;
+    const payload={cuartel_id,year,
+      kg_ha:kgha,kg_totales:kgha*(q.has||1),notas:el('ep2-n').value||null,usuario_id:myProfile().id};
+    if (pr?.id) await sb('PATCH',`produccion_prod?id=eq.${pr.id}`,payload);
+    else await sb('POST','produccion_prod',payload);
     await loadAll(); produccion();
   });
 }
