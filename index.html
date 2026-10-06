@@ -1945,7 +1945,7 @@ async function labores() {
           <td>${l.terminada?'<span class="tbadge tb-green">✅ Lista</span>':vencida?'<span class="tbadge tb-red">⚠️ Vencida</span>':'<span class="tbadge tb-amber">En curso</span>'}</td>
           <td><span class="tbadge ${l.mano_obra==='contratista'?'tb-blue':'tb-green'}">${l.mano_obra||'—'}</span></td>
           <td style="font-size:10px;">${l.contratista||'—'}</td>
-          <td style="font-size:10px;">${l.producto?l.producto+(l.dosis?' '+l.dosis+' '+(l.unidad_dosis||''):''):'—'}</td>
+          <td style="font-size:10px;">${formatProductos(l)}${l.mojamiento_lha?`<div style="font-size:9px;color:var(--text3);">Mojamiento: ${l.mojamiento_lha} L/ha</div>`:''}</td>
           <td style="font-weight:700;color:var(--green);">${l.costo_total?'$'+Math.round(l.costo_total).toLocaleString():'—'}</td>
           <td style="display:flex;gap:3px;">
             ${!l.terminada?`<button class="tbtn" style="font-size:10px;padding:0 5px;" onclick="terminarLabor(${l.id})">✅</button>`:''}
@@ -2008,6 +2008,48 @@ function buildGantt(data) {
   <div style="font-size:9px;color:var(--text3);margin-top:4px;padding:0 8px;">Pasa el mouse sobre cada barra para ver el detalle completo (labor, campo, huerto y fechas).</div>`;
 }
 
+// --- Multi-producto por labor -------------------------------------------
+// Una aplicación puede llevar más de un producto (ej: fungicida + adherente),
+// y la dosis de cada uno depende del mojamiento (L/Ha de caldo aplicado):
+// la misma dosis rinde distinto si se aplican 500 L/ha que si se aplican
+// 2000 L/ha. Por eso los productos se guardan como lista (columna `productos`,
+// jsonb) y el mojamiento se guarda aparte (`mojamiento_lha`). Los campos
+// antiguos producto/dosis/unidad_dosis se mantienen en la fila (reflejando el
+// primer producto) solo por compatibilidad con datos históricos.
+function prodRowHtml(p) {
+  p = p || {};
+  const esc = s => String(s ?? '').replace(/"/g, '&quot;');
+  return `<div class="lb-prod-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:6px;margin-bottom:4px;">
+    <input class="lb-prod-nombre" type="text" placeholder="Producto" value="${esc(p.producto)}">
+    <input class="lb-prod-dosis" type="text" placeholder="Dosis" value="${esc(p.dosis)}">
+    <input class="lb-prod-unidad" type="text" placeholder="Unidad" value="${esc(p.unidad_dosis)}">
+    <button type="button" class="tbtn" style="color:var(--red);padding:0 7px;" onclick="this.closest('.lb-prod-row').remove()" title="Quitar producto">✕</button>
+  </div>`;
+}
+function addProdRow(containerId) {
+  el(containerId).insertAdjacentHTML('beforeend', prodRowHtml());
+}
+function collectProductos(containerId) {
+  const out = [];
+  document.querySelectorAll(`#${containerId} .lb-prod-row`).forEach(r => {
+    const producto = r.querySelector('.lb-prod-nombre').value.trim();
+    const dosis = r.querySelector('.lb-prod-dosis').value.trim();
+    const unidad_dosis = r.querySelector('.lb-prod-unidad').value.trim();
+    if (producto || dosis) out.push({ producto, dosis, unidad_dosis });
+  });
+  return out;
+}
+function productosDeLabor(l) {
+  if (Array.isArray(l.productos) && l.productos.length) return l.productos;
+  if (l.producto) return [{ producto: l.producto, dosis: l.dosis, unidad_dosis: l.unidad_dosis }];
+  return [];
+}
+function formatProductos(l) {
+  const items = productosDeLabor(l);
+  if (!items.length) return '—';
+  return items.map(p => `${p.producto}${p.dosis ? ' ' + p.dosis + ' ' + (p.unidad_dosis || '') : ''}`).join('; ');
+}
+
 async function addLabor() {
   const campoOpts=CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
   const cuartelOpts='<option value="">Campo general</option>'+CUARTELES.map(c=>{
@@ -2035,11 +2077,12 @@ async function addLabor() {
         <div><label>Costo $/planta</label><input id="lb-cpl" type="number"></div>
         <div><label>Costo total $</label><input id="lb-ct" type="number"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <div><label>Producto</label><input id="lb-prod" type="text"></div>
-        <div><label>Dosis</label><input id="lb-dosis" type="text" placeholder="2.5"></div>
-        <div><label>Unidad</label><input id="lb-ud" type="text" placeholder="L/ha, g/hl..."></div>
+      <div>
+        <label>Productos aplicados <span style="font-weight:400;color:var(--text3);">(si es una aplicación con más de un producto, agrega una fila por cada uno)</span></label>
+        <div id="lb-prods-container">${prodRowHtml()}</div>
+        <button type="button" class="tbtn" style="font-size:11px;margin-top:4px;" onclick="addProdRow('lb-prods-container')">+ Agregar producto</button>
       </div>
+      <div><label>Mojamiento (L/Ha) <span style="font-weight:400;color:var(--text3);">— caldo aplicado por hectárea (la misma dosis rinde distinto con 500 que con 2000 L/ha)</span></label><input id="lb-moj" type="number" placeholder="Ej: 1000"></div>
       <div><label>Notas</label><input id="lb-notas" type="text"></div>
     </div>`,async()=>{
     const cid=parseInt(el('lb-cp').value)||null;
@@ -2058,13 +2101,17 @@ async function addLabor() {
         ct=cpl*(cuartel.n_plantas||1250);
       }
     }
+    const productos=collectProductos('lb-prods-container');
     await sb('POST','labores',{
       campo_id:cid,cuartel_id:qid,
       nombre:el('lb-n').value,mano_obra:el('lb-mo').value,contratista:el('lb-cont').value||null,
       fecha_inicio:el('lb-fi').value||null,fecha_fin:el('lb-ff').value||null,
       costo_ha:parseFloat(el('lb-cha').value)||null,costo_pl:parseFloat(el('lb-cpl').value)||null,
-      costo_total:ct,producto:el('lb-prod').value||null,
-      dosis:el('lb-dosis').value||null,unidad_dosis:el('lb-ud').value||null,
+      costo_total:ct,productos:productos.length?productos:null,
+      mojamiento_lha:parseFloat(el('lb-moj').value)||null,
+      // Compatibilidad con la columna antigua de un solo producto.
+      producto:productos[0]?.producto||null,
+      dosis:productos[0]?.dosis||null,unidad_dosis:productos[0]?.unidad_dosis||null,
       notas:el('lb-notas').value||null,usuario_id:myProfile().id,
     });
     await labores();
@@ -2072,7 +2119,13 @@ async function addLabor() {
 }
 
 async function terminarLabor(id) {
-  await sb('PATCH',`labores?id=eq.${id}`,{terminada:true,fecha_fin:new Date().toISOString().slice(0,10)});
+  // Ojo: antes esto pisaba fecha_fin con la fecha de HOY siempre, incluso si la
+  // labor ya tenía una fecha de término real cargada. Ahora solo se completa
+  // fecha_fin con hoy cuando la labor no tenía ninguna fecha de término.
+  const l = LABORES_DATA.find(x=>x.id===id);
+  const payload = {terminada:true};
+  if (!l?.fecha_fin) payload.fecha_fin = new Date().toISOString().slice(0,10);
+  await sb('PATCH',`labores?id=eq.${id}`,payload);
   await labores();
 }
 
@@ -2091,13 +2144,24 @@ async function editLabor(id) {
           <select id="elb-t"><option value="false" ${!l.terminada?'selected':''}>En curso</option>
             <option value="true" ${l.terminada?'selected':''}>Terminada</option></select></div>
       </div>
+      <div>
+        <label>Productos aplicados <span style="font-weight:400;color:var(--text3);">(si es una aplicación con más de un producto, agrega una fila por cada uno)</span></label>
+        <div id="elb-prods-container">${(productosDeLabor(l).length?productosDeLabor(l).map(prodRowHtml):[prodRowHtml()]).join('')}</div>
+        <button type="button" class="tbtn" style="font-size:11px;margin-top:4px;" onclick="addProdRow('elb-prods-container')">+ Agregar producto</button>
+      </div>
+      <div><label>Mojamiento (L/Ha) <span style="font-weight:400;color:var(--text3);">— caldo aplicado por hectárea</span></label><input id="elb-moj" type="number" value="${l.mojamiento_lha||''}" placeholder="Ej: 1000"></div>
       <div><label>Notas</label><input id="elb-notas" type="text" value="${l.notas||''}"></div>
     </div>`,async()=>{
+    const productos=collectProductos('elb-prods-container');
     await sb('PATCH',`labores?id=eq.${id}`,{
       nombre:el('elb-n').value,fecha_inicio:el('elb-fi').value||null,
       fecha_fin:el('elb-ff').value||null,
       costo_total:parseFloat(el('elb-ct').value)||null,
       terminada:el('elb-t').value==='true',
+      productos:productos.length?productos:null,
+      mojamiento_lha:parseFloat(el('elb-moj').value)||null,
+      producto:productos[0]?.producto||null,
+      dosis:productos[0]?.dosis||null,unidad_dosis:productos[0]?.unidad_dosis||null,
       notas:el('elb-notas').value||null});
     await labores();
   });
@@ -2606,12 +2670,13 @@ async function exportCSV(seccion){
     });
   } else if(seccion==='labores'){
     const lb=await sb('GET','labores?order=fecha_inicio.asc').catch(()=>[]);
-    headers=['Campo','Cuartel','Labor','Mano_Obra','Contratista','Fecha_Inicio','Fecha_Fin','Terminada','Producto','Dosis','Unidad','Costo_Total','Notas'];
+    headers=['Campo','Cuartel','Labor','Mano_Obra','Contratista','Fecha_Inicio','Fecha_Fin','Terminada','Productos','Mojamiento_LHa','Costo_Total','Notas'];
     lb.forEach(l=>{
       const c=CAMPOS.find(x=>x.id===l.campo_id);
       const q=CUARTELES.find(x=>x.id===l.cuartel_id);
+      const productosTxt=productosDeLabor(l).map(p=>`${p.producto} ${p.dosis||''} ${p.unidad_dosis||''}`.trim()).join(' | ');
       rows.push([c?.nombre,q?.nombre,l.nombre,l.mano_obra,l.contratista,l.fecha_inicio,l.fecha_fin,
-        l.terminada?'SI':'NO',l.producto,l.dosis,l.unidad_dosis,l.costo_total,l.notas]);
+        l.terminada?'SI':'NO',productosTxt,l.mojamiento_lha,l.costo_total,l.notas]);
     });
   }
   if(!rows.length){alert('Sin datos para exportar');return;}
