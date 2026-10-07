@@ -881,21 +881,31 @@ async function computeLluviaPorEstacion() {
   // sobrecontaría, porque cada una ya es el acumulado del día hasta esa hora.
   // station_readings (el historial guardado) NO tiene columna station_id —
   // solo station_name en texto libre (ej. "Hacienda Ibacache", "MACAYA",
-  // "El Carmen") — así que el match con el campo es por nombre, sin
-  // distinguir mayúsculas/minúsculas y permitiendo que uno sea parte del otro
-  // (para que "Hacienda Ibacache" calce con el campo "Ibacache").
+  // "El Carmen") — así que el match con el campo es por nombre. Si el campo
+  // tiene `descripcion` cargada se usa como alias exacto de la estación (para
+  // los casos en que el nombre del campo no calza con el station_name, ej.
+  // La Tuna y Peñuelas comparten la estación "MACAYA"); si no, se compara
+  // contra el nombre del campo sin distinguir mayúsculas y permitiendo que
+  // uno sea parte del otro (para que "Hacienda Ibacache" calce con "Ibacache").
+  // Una misma lectura puede pertenecer a MÁS DE UN campo (estación compartida),
+  // así que se suma a todos los campos que calcen, no solo al primero.
   const porCampo = {};
   rows.forEach(r=>{
     if (r.rain_mm===null || r.rain_mm===undefined) return;
     const sn = (r.station_name||'').toLowerCase();
-    const campo = CAMPOS.find(c=>{
+    const matches = CAMPOS.filter(c=>{
+      const alias = (c.descripcion||'').toLowerCase();
+      if (alias) return sn && (sn===alias || sn.includes(alias) || alias.includes(sn));
       const cn = (c.nombre||'').toLowerCase();
       return cn && sn && (sn===cn || sn.includes(cn) || cn.includes(sn));
     });
-    const key = campo ? `campo:${campo.id}` : `otro:${r.station_name}`;
     const fecha = r.recorded_at.slice(0,10);
-    porCampo[key] = porCampo[key] || {label: campo?campo.nombre:(r.station_name||'Estación sin nombre'), dias:{}};
-    porCampo[key].dias[fecha] = Math.max(porCampo[key].dias[fecha]||0, r.rain_mm);
+    const keys = matches.length ? matches.map(c=>`campo:${c.id}`) : [`otro:${r.station_name}`];
+    keys.forEach((key,i)=>{
+      const label = matches.length ? matches[i].nombre : (r.station_name||'Estación sin nombre');
+      porCampo[key] = porCampo[key] || {label, dias:{}};
+      porCampo[key].dias[fecha] = Math.max(porCampo[key].dias[fecha]||0, r.rain_mm);
+    });
   });
   return porCampo;
 }
