@@ -366,6 +366,16 @@ function gdAcumCampoHastaFecha(campoId, year, corteMD) {
 // frio_alerts.modelo puede ser 'horas' | 'richardson' | 'utah' (frío) o 'gd'
 // (grados-día) — mismo registro, mismo umbral, distinto valor a comparar.
 const MODELO_FRIO_FIELD = {horas:'horas_frio', richardson:'richardson', utah:'dynamic_model'};
+// Modelos de frío disponibles por CAMPO (columnas de frio_campo). Se usan tanto
+// en el selector "Frío acumulado por campo" como en la tarjeta "Frío acumulado
+// — usuarios", para que ambas muestren siempre el mismo modelo elegido en vez
+// de que la tarjeta de usuarios quede pegada a un modelo fijo.
+const FRIO_MODELOS = [
+  {value:'horas_frio',   label:'Horas Frío'},
+  {value:'richardson',   label:'Richardson Mod.'},
+  {value:'dynamic_model',label:'Porciones de Frío (Dynamic Model)'},
+];
+const FRIO_MODELO_LABELS = Object.fromEntries(FRIO_MODELOS.map(m=>[m.value,m.label]));
 function labelModeloAlerta(modelo) {
   return modelo==='gd' ? 'Grados Día'
     : modelo==='utah' ? 'Porciones de Frío'
@@ -664,12 +674,6 @@ function dashboard() {
   const extraStations = rdgs.filter(r => !matched.has(r));
   const allStationTiles = [...stationList, ...extraStations];
 
-  const FRIO_MODELOS = [
-    {value:'horas_frio',   label:'Horas Frío'},
-    {value:'richardson',   label:'Richardson Mod.'},
-    {value:'dynamic_model',label:'Porciones de Frío (Dynamic Model)'},
-  ];
-
   el('content').innerHTML = `
   <div class="g4" style="margin-bottom:14px;">
     <div class="metric m-frost">
@@ -678,7 +682,7 @@ function dashboard() {
         <select class="sel" id="dash-frio-campo" onchange="updateDashFrio()" style="flex:1;font-size:10px;">
           ${CAMPOS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('')}
         </select>
-        <select class="sel" id="dash-frio-model" onchange="updateDashFrio()" style="flex:1;font-size:10px;">
+        <select class="sel" id="dash-frio-model" onchange="updateDashFrio();updateDashFrioUsuarios();" style="flex:1;font-size:10px;">
           ${FRIO_MODELOS.map(m=>`<option value="${m.value}">${m.label}</option>`).join('')}
         </select>
       </div>
@@ -711,24 +715,8 @@ function dashboard() {
 
   <div class="g2" style="margin-bottom:14px;">
     <div class="card">
-      <div class="card-header"><div class="card-title">❄️ Frío acumulado — usuarios</div></div>
-      ${ALL_USERS.map(u=>{
-        const c=CHILL_ROWS.filter(x=>x.usuario_id===u.id).sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at))[0];
-        const estacionLabel = u.estacion_tipo==='davis'
-          ? `Davis ${u.davis_station_id||'?'}`
-          : `Agroclima ${u.agroclima_nombre||u.agroclima_codigo||'?'}`;
-        return `<div class="stat-row">
-          <div class="avatar" style="width:26px;height:26px;font-size:10px;flex-shrink:0;">${u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
-          <div style="flex:1;"><div style="font-size:11px;font-weight:600;">${u.nombre}</div>
-            <div style="font-size:10px;color:var(--text3);">${c?.label||u.modelo_frio||'—'} · 📡 ${estacionLabel}</div></div>
-          <div style="text-align:right;">
-            <div style="font-size:14px;font-weight:700;color:var(--frost);">${fmt(c?.acumulado,1)}</div>
-            ${isChillPeriodActive()
-              ? `<div style="font-size:10px;color:var(--text3);">+${fmt(c?.diario,1)} hoy</div>`
-              : `<div style="font-size:10px;color:var(--text3);">Total temporada</div>`}
-          </div>
-        </div>`;
-      }).join('')||'<div class="empty">Sin usuarios</div>'}
+      <div class="card-header"><div class="card-title" id="dash-frio-usuarios-title">❄️ Frío acumulado — usuarios (${FRIO_MODELO_LABELS.horas_frio})</div></div>
+      <div id="dash-frio-usuarios-body">${renderFrioUsuariosHTML('horas_frio')}</div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">🌡️ GD Acumulado — usuarios</div></div>
@@ -784,6 +772,7 @@ function dashboard() {
   updateDashFrio();
   updateDashGD();
   updateDashLluvia();
+  updateDashFrioUsuarios();
 }
 
 function updateDashFrio() {
@@ -807,6 +796,41 @@ function updateDashFrio() {
   body.innerHTML = `
     <div class="metric-val">${fmt(acum,1)}</div>
     <div class="metric-sub">T. anterior a la misma fecha: ${acumPrev===null?'sin datos':fmt(acumPrev,1)}</div>`;
+}
+
+// "Frío acumulado — usuarios": antes mostraba el valor ya calculado en
+// CHILL_ROWS, que queda fijo al modelo de frío configurado en el perfil de
+// cada usuario (u.modelo_frio) — no reaccionaba al selector de modelo de la
+// tarjeta "Frío acumulado por campo". Ahora se recalcula por CAMPO (igual que
+// esa tarjeta, vía frioAcumCampo) usando el modelo elegido ahí, así ambas
+// muestran siempre el mismo modelo.
+function renderFrioUsuariosHTML(modelo) {
+  const y = yr();
+  return ALL_USERS.map(u=>{
+    const campo = campoForEstacion(u.estacion_tipo, u.davis_station_id, u.agroclima_codigo);
+    const estacionLabel = u.estacion_tipo==='davis'
+      ? `Davis ${u.davis_station_id||'?'}`
+      : `Agroclima ${u.agroclima_nombre||u.agroclima_codigo||'?'}`;
+    const acum = campo ? frioAcumCampo(campo.id, y, modelo) : null;
+    return `<div class="stat-row">
+      <div class="avatar" style="width:26px;height:26px;font-size:10px;flex-shrink:0;">${u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+      <div style="flex:1;"><div style="font-size:11px;font-weight:600;">${u.nombre}</div>
+        <div style="font-size:10px;color:var(--text3);">📡 ${estacionLabel}${campo?' · '+campo.nombre:''}</div></div>
+      <div style="text-align:right;">
+        <div style="font-size:14px;font-weight:700;color:var(--frost);">${acum!==null?fmt(acum,1):'Sin datos'}</div>
+        ${isChillPeriodActive()
+          ? `<div style="font-size:10px;color:var(--text3);">Acumulado a hoy</div>`
+          : `<div style="font-size:10px;color:var(--text3);">Total temporada</div>`}
+      </div>
+    </div>`;
+  }).join('')||'<div class="empty">Sin usuarios</div>';
+}
+function updateDashFrioUsuarios() {
+  const modelo = el('dash-frio-model')?.value || 'horas_frio';
+  const body = el('dash-frio-usuarios-body');
+  const title = el('dash-frio-usuarios-title');
+  if (body) body.innerHTML = renderFrioUsuariosHTML(modelo);
+  if (title) title.textContent = `❄️ Frío acumulado — usuarios (${FRIO_MODELO_LABELS[modelo]||modelo})`;
 }
 
 function updateDashGD() {
@@ -845,24 +869,35 @@ async function computeLluviaPorEstacion() {
     const PAGE = 1000;
     let offset = 0;
     while (true) {
-      const page = await sb('GET', `station_readings?recorded_at=gte.${yearStart}&select=station_name,rain_mm,recorded_at&order=recorded_at.asc&limit=${PAGE}&offset=${offset}`);
+      const page = await sb('GET', `station_readings?recorded_at=gte.${yearStart}&select=station_name,station_id,rain_mm,recorded_at&order=recorded_at.asc&limit=${PAGE}&offset=${offset}`);
       rows = rows.concat(page);
       if (!page.length || page.length < PAGE) break;
       offset += PAGE;
     }
   } catch(e) { return null; }
-  // Por estación y día calendario nos quedamos con el máximo rain_mm del día
+  // Por campo y día calendario nos quedamos con el máximo rain_mm del día
   // (es un acumulado-del-día que se reinicia a medianoche), y sumamos esos
   // máximos diarios — sumar directamente todas las lecturas horarias
   // sobrecontaría, porque cada una ya es el acumulado del día hasta esa hora.
-  const porDia = {};
+  // Se agrupa por CAMPO (igual que readingForCampo: por station_id/código, con
+  // station_name como respaldo) en vez de por el station_name crudo: así, si
+  // una lectura llega con un nombre de estación distinto al del campo (ej.
+  // "Agroclima 340070" en vez de "El Carmen"), igual se asocia al campo
+  // correcto en vez de desaparecer del resumen sin aviso.
+  const porCampo = {};
   rows.forEach(r=>{
     if (r.rain_mm===null || r.rain_mm===undefined) return;
+    const campo = CAMPOS.find(c=>
+      (c.estacion_tipo==='davis' && c.davis_station_id && String(r.station_id)===String(c.davis_station_id)) ||
+      (c.estacion_tipo!=='davis' && c.agroclima_codigo && String(r.station_id)===String(c.agroclima_codigo)) ||
+      r.station_name===c.nombre
+    );
+    const key = campo ? `campo:${campo.id}` : `otro:${r.station_name}`;
     const fecha = r.recorded_at.slice(0,10);
-    porDia[r.station_name] = porDia[r.station_name] || {};
-    porDia[r.station_name][fecha] = Math.max(porDia[r.station_name][fecha]||0, r.rain_mm);
+    porCampo[key] = porCampo[key] || {label: campo?campo.nombre:(r.station_name||'Estación sin nombre'), dias:{}};
+    porCampo[key].dias[fecha] = Math.max(porCampo[key].dias[fecha]||0, r.rain_mm);
   });
-  return porDia;
+  return porCampo;
 }
 async function getLluviaPorEstacionCached() {
   if (LLUVIA_CACHE && (Date.now()-LLUVIA_CACHE.ts)<10*60*1000) return LLUVIA_CACHE.porDia;
@@ -870,21 +905,35 @@ async function getLluviaPorEstacionCached() {
   LLUVIA_CACHE = {ts:Date.now(), porDia};
   return porDia;
 }
-function renderLluviaResumenHTML(porDia) {
-  if (!porDia) return `<div style="font-size:10px;color:var(--red);">No se pudo calcular lluvia acumulada</div>`;
-  const estaciones = Object.keys(porDia);
-  if (!estaciones.length) return `<div style="font-size:10px;color:var(--text3);">Sin historial de lluvia guardado aún</div>`;
+function renderLluviaResumenHTML(porCampo) {
+  if (!porCampo) return `<div style="font-size:10px;color:var(--red);">No se pudo calcular lluvia acumulada</div>`;
   const hoy = new Date();
   const mesActual = hoy.toISOString().slice(0,7);
   const hoyStr = hoy.toISOString().slice(0,10);
-  return estaciones.map(name=>{
-    const dias = porDia[name];
+  // Un bloque por cada campo configurado — aunque no tenga lecturas, para que
+  // se note que falta sincronizar su estación en vez de desaparecer en
+  // silencio — más cualquier lectura que llegó sin poder asociarse a un campo.
+  const entradas = CAMPOS.map(c=>{
+    const entry = porCampo[`campo:${c.id}`];
+    return {label:c.nombre, dias: entry?entry.dias:{}};
+  });
+  Object.keys(porCampo).filter(k=>k.startsWith('otro:')).forEach(k=>{
+    entradas.push({label: porCampo[k].label+' (sin campo asociado)', dias: porCampo[k].dias});
+  });
+  if (!entradas.length) return `<div style="font-size:10px;color:var(--text3);">Sin historial de lluvia guardado aún</div>`;
+  return entradas.map(({label,dias})=>{
     const fechas = Object.keys(dias);
+    if (!fechas.length) {
+      return `<div style="margin-bottom:6px;">
+        <div style="font-size:10px;font-weight:600;color:var(--text2);">${label}</div>
+        <div style="font-size:10px;color:var(--text3);">Sin datos de lluvia sincronizados aún</div>
+      </div>`;
+    }
     const lluviaHoy = dias[hoyStr] ?? null;
     const mesAcum = fechas.filter(f=>f.slice(0,7)===mesActual).reduce((s,f)=>s+dias[f],0);
     const anioAcum = fechas.reduce((s,f)=>s+dias[f],0);
     return `<div style="margin-bottom:6px;">
-      <div style="font-size:10px;font-weight:600;color:var(--text2);">${name}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--text2);">${label}</div>
       <div style="display:flex;justify-content:space-between;font-size:10px;gap:4px;">
         <span>Hoy: <b>${lluviaHoy===null?'—':fmt(lluviaHoy,1)+'mm'}</b></span>
         <span>Mes: <b>${fmt(mesAcum,1)}mm</b></span>
@@ -903,21 +952,45 @@ async function updateClimaLluvia() {
   if (!body) return;
   body.innerHTML = renderLluviaResumenHTML(await getLluviaPorEstacionCached());
 }
+// Tarjeta amigable de comparación vs. año anterior: flecha + % de diferencia,
+// a igual corte de fecha (mismo día-mes) para que la comparación sea justa
+// mientras la temporada está en curso.
+function fcDeltaHtml(actual, anterior) {
+  if (actual===null || actual===undefined) return '';
+  if (anterior===null || anterior===undefined || anterior===0) return '';
+  const pct = ((actual-anterior)/Math.abs(anterior))*100;
+  if (Math.abs(pct) < 1) return `<span style="font-size:9px;color:var(--text3);">≈ igual que ${yr()-1}</span>`;
+  const up = pct > 0;
+  return `<span style="font-size:9px;color:${up?'var(--green)':'var(--red)'};font-weight:600;">${up?'▲':'▼'} ${Math.abs(pct).toFixed(0)}% vs ${yr()-1}</span>`;
+}
 function updateClimaFrioGD() {
   const modelo = el('clima-frio-modelo')?.value || 'horas_frio';
-  const tbody  = el('clima-friogd-tbody');
-  if (!tbody) return;
+  const body   = el('clima-friogd-body');
+  if (!body) return;
   const y = yr();
-  tbody.innerHTML = CAMPOS.map(c=>{
-    const frio = frioAcumCampo(c.id, y, modelo);
-    const gd   = gdAcumCampo(c.id, y);
-    return `<tr>
-      <td style="font-weight:600;">${c.nombre}</td>
-      <td style="font-size:10px;color:var(--text3);">${c.estacion_tipo==='davis'?'Davis':'Agroclima'}</td>
-      <td style="color:var(--frost);font-weight:700;">${frio!==null?frio.toFixed(1):'sin datos'}</td>
-      <td style="color:var(--purple);font-weight:700;">${gd!==null?fmt(gd,1):'sin datos'}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="4" class="empty">Sin campos</td></tr>';
+  const hoyMD = new Date().toISOString().slice(5,10);
+  body.innerHTML = CAMPOS.map(c=>{
+    const frio     = frioAcumCampo(c.id, y, modelo);
+    const frioPrev = frioAcumCampoHastaFecha(c.id, y-1, modelo, hoyMD);
+    const gd       = gdAcumCampo(c.id, y);
+    const gdPrev   = gdAcumCampoHastaFecha(c.id, y-1, hoyMD);
+    return `<div style="background:var(--bg);border-radius:var(--r);padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="min-width:120px;flex:1;">
+        <div style="font-weight:600;font-size:13px;">${c.nombre}</div>
+        <div style="font-size:9px;color:var(--text3);">📡 ${c.estacion_tipo==='davis'?'Davis':'Agroclima'}</div>
+      </div>
+      <div style="text-align:center;min-width:90px;">
+        <div style="font-size:9px;color:var(--text3);">❄️ Frío acumulado</div>
+        <div style="color:var(--frost);font-weight:700;font-size:15px;">${frio!==null?frio.toFixed(1):'sin datos'}</div>
+        ${fcDeltaHtml(frio,frioPrev)}
+      </div>
+      <div style="text-align:center;min-width:90px;">
+        <div style="font-size:9px;color:var(--text3);">🌱 Grados Día</div>
+        <div style="color:var(--purple);font-weight:700;font-size:15px;">${gd!==null?fmt(gd,1):'sin datos'}</div>
+        ${fcDeltaHtml(gd,gdPrev)}
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty">Sin campos</div>';
 }
 
 // ================================================================
@@ -942,10 +1015,9 @@ function clima() {
         <option value="dynamic_model">Porciones de Frío (Dynamic Model, Fishman &amp; Erez 1990)</option>
       </select>
     </div>
-    <table>
-      <thead><tr><th>Campo</th><th>Estación</th><th>Frío acumulado</th><th>GD acumulados</th></tr></thead>
-      <tbody id="clima-friogd-tbody"><tr><td colspan="4" class="empty">Cargando…</td></tr></tbody>
-    </table>
+    <div id="clima-friogd-body" style="display:flex;flex-direction:column;gap:8px;">
+      <div class="empty">Cargando…</div>
+    </div>
   </div>
   <div class="card" style="margin-bottom:14px;">
     <div class="card-header">
@@ -985,16 +1057,23 @@ function clima() {
     <div id="fc-calib-note" style="font-size:9px;color:var(--text3);margin-bottom:8px;"></div>
     <div style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Fecha</th><th colspan="3">Open-Meteo</th><th colspan="3">YR (met.no)</th><th>T.mín ajustado*</th><th>Riesgo</th></tr>
-      <tr><th></th><th>T.mín</th><th>T.máx</th><th>Lluvia</th><th>T.mín</th><th>T.máx</th><th>Lluvia</th><th>tu estación</th><th>helada</th></tr></thead>
-      <tbody id="fc-tbody"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody>
+      <thead><tr>
+        <th>Fecha</th>
+        <th>🌦️ Open-Meteo</th>
+        <th>🧭 YR (met.no)</th>
+        <th>Diferencia<br><span style="font-size:8px;font-weight:400;">entre modelos</span></th>
+        <th>T.mín ajustado*<br><span style="font-size:8px;font-weight:400;">tu estación</span></th>
+        <th>Riesgo helada</th>
+      </tr></thead>
+      <tbody id="fc-tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
     </table>
     </div>
     <div style="margin-top:12px;"><canvas id="fcChart" style="height:220px;"></canvas></div>
     <div style="font-size:9px;color:var(--text3);margin-top:4px;">
-      Pronóstico geográfico: Open-Meteo y YR/met.no para la ubicación indicada arriba.
+      Pronóstico geográfico combinando 3 modelos: Open-Meteo y YR/met.no (temperatura, lluvia y % de probabilidad de lluvia) para la ubicación indicada arriba, más el modelo propio ajustado a tu estación.
       *T.mín ajustado: modelo propio calibrado con el histórico real de temperaturas de la estación (punto de rocío 2 h después de la puesta de sol → T.mín de madrugada); se usa como riesgo principal cuando está disponible.
       Riesgo de helada usa tus umbrales configurados (Leve ${thr.frost_leve}°C · Moderada ${thr.frost_moderada}°C · Severa ${thr.frost_severa}°C).
+      Nota: ni Davis WeatherLink ni el portal de Agroclima entregan pronóstico de lluvia a futuro (solo lecturas actuales e históricas) — la probabilidad de lluvia que ves aquí viene de Open-Meteo, que sí es un servicio de pronóstico.
     </div>
   </div>`;
 
@@ -1022,7 +1101,7 @@ function updateClimaStation() {
 // No usa datos de tus estaciones: es pronóstico puro, para heladas futuras.
 // ================================================================
 async function fetchOpenMeteoForecast(lat, lon) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=14`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weathercode&timezone=auto&forecast_days=14`;
   const r = await fetch(url);
   if (!r.ok) throw new Error('Open-Meteo '+r.status);
   const j = await r.json();
@@ -1032,7 +1111,22 @@ async function fetchOpenMeteoForecast(lat, lon) {
     tmin:   d.temperature_2m_min ? d.temperature_2m_min[i] : null,
     tmax:   d.temperature_2m_max ? d.temperature_2m_max[i] : null,
     lluvia: d.precipitation_sum  ? d.precipitation_sum[i]  : null,
+    probLluvia: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null,
+    wcode:  d.weathercode ? d.weathercode[i] : null,
   }));
+}
+// Códigos WMO de Open-Meteo reducidos a un ícono simple, para que la tabla se
+// lea de un vistazo en vez de solo números.
+function wcodeIcono(code) {
+  if (code==null) return '—';
+  if (code===0) return '☀️';
+  if ([1,2].includes(code)) return '🌤️';
+  if (code===3) return '☁️';
+  if ([45,48].includes(code)) return '🌫️';
+  if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return '🌧️';
+  if ([71,73,75,77,85,86].includes(code)) return '🌨️';
+  if ([95,96,99].includes(code)) return '⛈️';
+  return '—';
 }
 
 async function fetchYrForecast(lat, lon) {
@@ -1185,7 +1279,7 @@ async function updateClimaForecast() {
   const calibNote = el('fc-calib-note');
   if (!loc) return;
   if (locNote) locNote.textContent = `📍 Ubicación usada: ${loc.label} (${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)})`;
-  if (tbody)  tbody.innerHTML  = `<tr><td colspan="9" class="empty">Cargando pronóstico…</td></tr>`;
+  if (tbody)  tbody.innerHTML  = `<tr><td colspan="6" class="empty">Cargando pronóstico…</td></tr>`;
   if (banner) banner.innerHTML = '';
 
   const coef = FROST_CALIB[stationName];
@@ -1213,7 +1307,7 @@ async function updateClimaForecast() {
   }
 
   if (!om && !yrData) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="empty">No se pudo obtener el pronóstico (sin conexión a Open-Meteo ni YR ahora mismo)</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="empty">No se pudo obtener el pronóstico (sin conexión a Open-Meteo ni YR ahora mismo)</td></tr>`;
     return;
   }
 
@@ -1255,14 +1349,33 @@ async function updateClimaForecast() {
         riesgoHtml = `<span style="font-size:9px;color:var(--green);">🌬️ viento protector</span>`;
       }
       const lluviaAlta = 'font-weight:700;color:var(--blue);';
+      // Diferencia entre Open-Meteo y YR: cuán de acuerdo están los dos modelos
+      // geográficos en la T.mín de esa noche — si coinciden, más confianza; si
+      // difieren mucho, conviene mirar el pronóstico con cautela.
+      let diffHtml = '<span style="font-size:10px;color:var(--text3);">—</span>';
+      if (o.tmin!=null && y.tmin!=null) {
+        const diff = Math.abs(o.tmin - y.tmin);
+        const diffColor = diff<=1 ? 'var(--green)' : diff<=3 ? 'var(--amber)' : 'var(--red)';
+        const masFria = diff<=0.3 ? null : (o.tmin < y.tmin ? 'Open-Meteo' : 'YR');
+        diffHtml = `<div style="font-weight:700;color:${diffColor};">${diff.toFixed(1)}°C</div>
+          <div style="font-size:8px;color:var(--text3);">${masFria?masFria+' más fría':'coinciden'}</div>`;
+      }
       return `<tr style="${riesgo?'background:'+riesgo.color+'14;':''}">
         <td style="font-weight:600;">${fcFechaCorta(f)}</td>
-        <td>${fmt(o.tmin,1,'°C')}</td><td>${fmt(o.tmax,1,'°C')}</td><td style="${(o.lluvia||0)>thr.rain_alert_mm?lluviaAlta:''}">${fmt(o.lluvia,1,'mm')}${(o.lluvia||0)>thr.rain_alert_mm?' 🌧️':''}</td>
-        <td>${fmt(y.tmin,1,'°C')}</td><td>${fmt(y.tmax,1,'°C')}</td><td style="${(y.lluvia||0)>thr.rain_alert_mm?lluviaAlta:''}">${fmt(y.lluvia,1,'mm')}${(y.lluvia||0)>thr.rain_alert_mm?' 🌧️':''}</td>
+        <td>
+          <div style="font-size:15px;">${wcodeIcono(o.wcode)}</div>
+          <div style="font-size:11px;font-weight:600;">${fmt(o.tmin,1,'°')} / ${fmt(o.tmax,1,'°')}</div>
+          <div style="font-size:9px;${(o.lluvia||0)>thr.rain_alert_mm?lluviaAlta:'color:var(--text3);'}">${fmt(o.lluvia,1,'mm')}${(o.lluvia||0)>thr.rain_alert_mm?' 🌧️':''}${o.probLluvia!=null?' ('+Math.round(o.probLluvia)+'%)':''}</div>
+        </td>
+        <td>
+          <div style="font-size:11px;font-weight:600;">${fmt(y.tmin,1,'°')} / ${fmt(y.tmax,1,'°')}</div>
+          <div style="font-size:9px;${(y.lluvia||0)>thr.rain_alert_mm?lluviaAlta:'color:var(--text3);'}">${fmt(y.lluvia,1,'mm')}${(y.lluvia||0)>thr.rain_alert_mm?' 🌧️':''}</div>
+        </td>
+        <td>${diffHtml}</td>
         <td style="font-weight:700;${tminAjustado!=null&&tminAjustado<=thr.frost_leve?'color:var(--frost);':''}">${tminAjustado!=null?fmt(tminAjustado,1,'°C'):'—'}</td>
         <td>${riesgoHtml}</td>
       </tr>`;
-    }).join('') || `<tr><td colspan="9" class="empty">Sin datos</td></tr>`;
+    }).join('') || `<tr><td colspan="6" class="empty">Sin datos</td></tr>`;
   }
 
   if (banner) {
@@ -1516,13 +1629,27 @@ function buildGDChart(visibles) {
 
   if (!fechas.length) { if(CHARTS.gd){CHARTS.gd.destroy();CHARTS.gd=null;} return; }
 
-  const datasets = visibles.map((c,i)=>{
+  const datasets = [];
+  visibles.forEach((c,i)=>{
     const porFecha = {};
     GD_CAMPOS.filter(g=>g.campo_id===c.id&&g.year===y).forEach(g=>{ porFecha[g.fecha]=g.gd_acum; });
-    return {label:c.nombre,data:fechas.map(f=>porFecha[f]??null),
-      borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'20',
-      fill:false,tension:.3,borderWidth:2,pointRadius:1,spanGaps:true};
-  }).filter(d=>d.data.some(v=>v!==null));
+    const dataActual = fechas.map(f=>porFecha[f]??null);
+    if (dataActual.some(v=>v!==null)) {
+      datasets.push({label:c.nombre,data:dataActual,
+        borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'20',
+        fill:false,tension:.3,borderWidth:2,pointRadius:1,spanGaps:true});
+    }
+    // Año anterior, alineado por día-mes (MM-DD) para comparar "a la misma fecha"
+    // en vez de por fecha exacta (que cambiaría de eje año a año).
+    const porFechaPrevMD = {};
+    GD_CAMPOS.filter(g=>g.campo_id===c.id&&g.year===y-1).forEach(g=>{ porFechaPrevMD[g.fecha.slice(5)]=g.gd_acum; });
+    const dataPrev = fechas.map(f=>porFechaPrevMD[f.slice(5)]??null);
+    if (dataPrev.some(v=>v!==null)) {
+      datasets.push({label:`${c.nombre} (${y-1})`,data:dataPrev,
+        borderColor:colors[i%colors.length]+'99',backgroundColor:'transparent',
+        fill:false,tension:.3,borderWidth:1.5,pointRadius:0,spanGaps:true,borderDash:[5,3]});
+    }
+  });
 
   if (!datasets.length) return;
   CHARTS.gd = new Chart(ctx,{type:'line',data:{labels:fechas.map(f=>f.slice(5)),datasets},
