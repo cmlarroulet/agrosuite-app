@@ -869,7 +869,7 @@ async function computeLluviaPorEstacion() {
     const PAGE = 1000;
     let offset = 0;
     while (true) {
-      const page = await sb('GET', `station_readings?recorded_at=gte.${yearStart}&select=station_name,station_id,rain_mm,recorded_at&order=recorded_at.asc&limit=${PAGE}&offset=${offset}`);
+      const page = await sb('GET', `station_readings?recorded_at=gte.${yearStart}&select=station_name,rain_mm,recorded_at&order=recorded_at.asc&limit=${PAGE}&offset=${offset}`);
       rows = rows.concat(page);
       if (!page.length || page.length < PAGE) break;
       offset += PAGE;
@@ -879,19 +879,19 @@ async function computeLluviaPorEstacion() {
   // (es un acumulado-del-día que se reinicia a medianoche), y sumamos esos
   // máximos diarios — sumar directamente todas las lecturas horarias
   // sobrecontaría, porque cada una ya es el acumulado del día hasta esa hora.
-  // Se agrupa por CAMPO (igual que readingForCampo: por station_id/código, con
-  // station_name como respaldo) en vez de por el station_name crudo: así, si
-  // una lectura llega con un nombre de estación distinto al del campo (ej.
-  // "Agroclima 340070" en vez de "El Carmen"), igual se asocia al campo
-  // correcto en vez de desaparecer del resumen sin aviso.
+  // station_readings (el historial guardado) NO tiene columna station_id —
+  // solo station_name en texto libre (ej. "Hacienda Ibacache", "MACAYA",
+  // "El Carmen") — así que el match con el campo es por nombre, sin
+  // distinguir mayúsculas/minúsculas y permitiendo que uno sea parte del otro
+  // (para que "Hacienda Ibacache" calce con el campo "Ibacache").
   const porCampo = {};
   rows.forEach(r=>{
     if (r.rain_mm===null || r.rain_mm===undefined) return;
-    const campo = CAMPOS.find(c=>
-      (c.estacion_tipo==='davis' && c.davis_station_id && String(r.station_id)===String(c.davis_station_id)) ||
-      (c.estacion_tipo!=='davis' && c.agroclima_codigo && String(r.station_id)===String(c.agroclima_codigo)) ||
-      r.station_name===c.nombre
-    );
+    const sn = (r.station_name||'').toLowerCase();
+    const campo = CAMPOS.find(c=>{
+      const cn = (c.nombre||'').toLowerCase();
+      return cn && sn && (sn===cn || sn.includes(cn) || cn.includes(sn));
+    });
     const key = campo ? `campo:${campo.id}` : `otro:${r.station_name}`;
     const fecha = r.recorded_at.slice(0,10);
     porCampo[key] = porCampo[key] || {label: campo?campo.nombre:(r.station_name||'Estación sin nombre'), dias:{}};
